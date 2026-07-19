@@ -22,7 +22,7 @@ function M.spawn(opts)
           local ok, err = pcall(opts.on_line, line)
           if not ok then
             vim.schedule(function()
-              vim.notify("agent-flow event error: " .. tostring(err), vim.log.levels.ERROR)
+              vim.notify("acp event error: " .. tostring(err), vim.log.levels.ERROR)
             end)
           end
         end

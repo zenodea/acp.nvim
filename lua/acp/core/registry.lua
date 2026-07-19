@@ -25,7 +25,7 @@ function M.emit(event, ...)
       local ok, err = pcall(fn, ...)
       if not ok then
         vim.schedule(function()
-          vim.notify("agent-flow listener error: " .. tostring(err), vim.log.levels.ERROR)
+          vim.notify("acp listener error: " .. tostring(err), vim.log.levels.ERROR)
         end)
       end
     end

@@ -3,7 +3,7 @@ local M = {}
 ---@param win integer
 ---@param role string
 local function mark(win, role)
-  vim.w[win].agent_flow_ui = role
+  vim.w[win].acp_ui = role
   vim.wo[win].number = false
   vim.wo[win].relativenumber = false
   vim.wo[win].signcolumn = "no"
@@ -15,9 +15,9 @@ end
 ---Build the chat column (chat + input) on the right of the current tab.
 ---@param thread Thread
 function M.build_chat_column(thread)
-  local cfg = require("agent-flow.config").options.ui
-  local chat_buf = require("agent-flow.ui.chat").ensure_buf(thread)
-  local input_buf = require("agent-flow.ui.input").ensure_buf(thread)
+  local cfg = require("acp.config").options.ui
+  local chat_buf = require("acp.ui.chat").ensure_buf(thread)
+  local input_buf = require("acp.ui.input").ensure_buf(thread)
 
   vim.cmd("botright " .. cfg.chat_width .. "vsplit")
   local chat_win = vim.api.nvim_get_current_win()
@@ -44,8 +44,8 @@ end
 
 ---Build the threads sidebar window on the left of the current tab.
 function M.build_sidebar()
-  local cfg = require("agent-flow.config").options.ui
-  local buf = require("agent-flow.ui.sidebar").ensure_buf()
+  local cfg = require("acp.config").options.ui
+  local buf = require("acp.ui.sidebar").ensure_buf()
   vim.cmd("topleft " .. cfg.sidebar_width .. "vsplit")
   local win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_buf(win, buf)
@@ -65,7 +65,7 @@ local function build_tab(thread)
   -- Center: restore the persisted code layout into the initial window.
   local code_win = vim.api.nvim_get_current_win()
   if thread.layout then
-    require("agent-flow.persist.layout").restore(thread.layout)
+    require("acp.persist.layout").restore(thread.layout)
   end
 
   vim.api.nvim_set_current_win(code_win)
@@ -79,7 +79,7 @@ end
 ---@return integer|nil win
 function M.find_ui_win(tabpage, role)
   for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
-    if vim.w[win].agent_flow_ui == role then
+    if vim.w[win].acp_ui == role then
       return win
     end
   end
@@ -90,7 +90,7 @@ local find_ui_win = M.find_ui_win
 ---Open (or focus) a thread's workspace tab.
 ---@param thread Thread
 function M.open(thread)
-  local registry = require("agent-flow.core.registry")
+  local registry = require("acp.core.registry")
   if thread:tab_valid() then
     vim.api.nvim_set_current_tabpage(thread.tabpage)
   else
@@ -100,9 +100,9 @@ function M.open(thread)
   thread.last_active = os.time()
   registry.emit("state")
 
-  local focus = require("agent-flow.config").options.ui.focus_on_open
+  local focus = require("acp.config").options.ui.focus_on_open
   if focus == "input" then
-    require("agent-flow.ui.input").focus(thread)
+    require("acp.ui.input").focus(thread)
   elseif focus == "sidebar" then
     local win = find_ui_win(thread.tabpage, "sidebar")
     if win then
@@ -113,11 +113,11 @@ end
 
 ---Show/hide the chat column in the current thread tab.
 function M.toggle_chat()
-  local registry = require("agent-flow.core.registry")
+  local registry = require("acp.core.registry")
   local tab = vim.api.nvim_get_current_tabpage()
   local thread = registry.find_by_tab(tab)
   if not thread then
-    vim.notify("agent-flow: current tab is not a thread workspace", vim.log.levels.WARN)
+    vim.notify("acp: current tab is not a thread workspace", vim.log.levels.WARN)
     return
   end
   local chat_win = find_ui_win(tab, "chat")
@@ -141,7 +141,7 @@ function M.capture_layout(thread)
   if not thread:tab_valid() then
     return
   end
-  local layout = require("agent-flow.persist.layout").capture(thread.tabpage)
+  local layout = require("acp.persist.layout").capture(thread.tabpage)
   if layout then
     thread.layout = layout
   end
