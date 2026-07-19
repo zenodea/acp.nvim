@@ -64,6 +64,9 @@ function M.ensure_buf(thread)
   vim.keymap.set("n", "<C-n>", function()
     history(thread, 1)
   end, opts("Next prompt"))
+  vim.keymap.set("n", "gm", function()
+    require("acp.agent.session").get(thread):select_mode()
+  end, opts("Select session mode"))
 
   -- Pasting lines yanked from a file inserts a context chip like
   -- "(file.txt 1-3)" instead of the raw text (expanded at send time).
