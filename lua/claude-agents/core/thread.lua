@@ -96,10 +96,11 @@ function Thread:set_status(status, detail)
   if self.status == status and self.status_detail == detail then
     return
   end
+  local old = self.status
   self.status = status
   self.status_detail = detail
   self.last_active = os.time()
-  require("claude-agents.core.registry").emit("status", self)
+  require("claude-agents.core.registry").emit("status", self, old)
 end
 
 ---@return boolean
