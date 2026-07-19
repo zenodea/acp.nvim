@@ -178,7 +178,10 @@ function Session:ensure_started(cb)
 
   self.rpc:request("initialize", {
     protocolVersion = 1,
-    clientCapabilities = { fs = { readTextFile = true, writeTextFile = true } },
+    clientCapabilities = {
+      fs = { readTextFile = true, writeTextFile = true },
+      terminal = true,
+    },
   }, function(result, ierr)
     if ierr or not result then
       self:fail_start(ierr, "initialize failed")
@@ -352,8 +355,50 @@ function Session:on_request(method, params, respond)
     else
       respond(nil, { code = -32603, message = err })
     end
+  elseif method == "terminal/create" then
+    local terminal = require("acp.agent.terminal")
+    local id, err = terminal.create(params, self.thread.cwd, function()
+      self:refresh_terminal_tools()
+    end)
+    if id then
+      respond({ terminalId = id })
+    else
+      respond(nil, { code = -32603, message = err })
+    end
+  elseif method == "terminal/output" then
+    local result = require("acp.agent.terminal").output(params.terminalId)
+    if result then
+      respond(result)
+    else
+      respond(nil, { code = -32602, message = "unknown terminal: " .. tostring(params.terminalId) })
+    end
+  elseif method == "terminal/wait_for_exit" then
+    local known = require("acp.agent.terminal").wait_for_exit(params.terminalId, function(exit)
+      respond(exit)
+    end)
+    if not known then
+      respond(nil, { code = -32602, message = "unknown terminal: " .. tostring(params.terminalId) })
+    end
+  elseif method == "terminal/kill" then
+    require("acp.agent.terminal").kill(params.terminalId)
+    respond(nil)
+  elseif method == "terminal/release" then
+    require("acp.agent.terminal").release(params.terminalId)
+    respond(nil)
   else
     respond(nil, { code = -32601, message = "method not supported: " .. method })
+  end
+end
+
+---Re-render every tool call embedding a terminal (new output arrived).
+function Session:refresh_terminal_tools()
+  for id, call in pairs(self.tool_calls) do
+    for _, item in ipairs(call.content or {}) do
+      if item.type == "terminal" then
+        require("acp.ui.chat").update_by_id(self.thread, id, events.tool_text(call))
+        break
+      end
+    end
   end
 end
 
