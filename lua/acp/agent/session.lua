@@ -513,6 +513,8 @@ function Session:on_notification(method, params)
     if not chat().update_by_id(self.thread, "plan", text) then
       chat().append(self.thread, "plan", text, "plan")
     end
+  elseif kind == "available_commands_update" then
+    self.commands = u.availableCommands or {}
   elseif kind == "current_mode_update" then
     if self.modes then
       self.modes.currentModeId = u.currentModeId
@@ -523,7 +525,7 @@ function Session:on_notification(method, params)
     chat().append(self.thread, "meta", "(mode: " .. ((mode and mode.name) or u.currentModeId) .. ")")
     require("acp.ui.workspace").update_winbar(self.thread)
   end
-  -- user_message_chunk (load replay), available_commands_update: ignored.
+  -- user_message_chunk (load replay): ignored.
 end
 
 ---@param code integer
