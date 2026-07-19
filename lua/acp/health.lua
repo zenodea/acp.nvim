@@ -10,24 +10,29 @@ function M.check()
   if vim.fn.has("nvim-0.10") == 1 then
     health.ok("Neovim >= 0.10")
   else
-    health.error("Neovim 0.10+ required (vim.system, extmark APIs)")
+    health.error("Neovim 0.10+ required")
   end
 
-  if vim.fn.executable(cfg.claude.cmd) == 1 then
-    local ok, out = util.system({ cfg.claude.cmd, "--version" })
-    if ok then
-      health.ok("claude CLI found: " .. out)
+  local names = require("acp.config").agent_names()
+  if #names == 0 then
+    health.error("no ACP agents configured (config: agents = { ... })")
+  end
+  for _, name in ipairs(names) do
+    local def = cfg.agents[name]
+    local bin = def.cmd and def.cmd[1]
+    if not bin then
+      health.error("agent '" .. name .. "' has no cmd")
+    elseif vim.fn.executable(bin) == 1 then
+      health.ok(("agent '%s': %s"):format(name, table.concat(def.cmd, " ")))
+      if bin == "npx" then
+        health.info("agent '" .. name .. "' runs via npx — first spawn may be slow while the package downloads")
+      end
     else
-      health.warn("claude CLI found but --version failed: " .. out)
+      health.error(("agent '%s': executable not found: %s"):format(name, bin))
     end
-    health.info(
-      "streaming permission prompts (permissions = \"prompt\") need a recent CLI; "
-        .. "if spawning fails, set claude.permissions to \"acceptEdits\" or \"default\""
-    )
-  else
-    health.error("claude CLI not found (config: claude.cmd = " .. cfg.claude.cmd .. ")", {
-      "install Claude Code: https://docs.anthropic.com/en/docs/claude-code",
-    })
+  end
+  if cfg.agents.claude then
+    health.info("the claude adapter uses your Claude Code login (run `claude` once to authenticate) or ANTHROPIC_API_KEY")
   end
 
   if vim.fn.executable("git") == 1 then
