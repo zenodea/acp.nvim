@@ -1,96 +1,81 @@
 # acp.nvim
 
-Zed-style agent threads for Neovim, built on the
-[Agent Client Protocol](https://agentclientprotocol.com) — Claude Code,
-Gemini CLI, Codex, and any other ACP agent, each in its own workspace.
+A Neovim plugin for running AI coding agents in parallel threads, built on the
+Agent Client Protocol (ACP). It works with any ACP agent. Claude Code and
+Codex are configured out of the box, and others like Gemini CLI can be added
+with a single config entry.
 
-Each **thread** owns a full workspace: its own tab page, its own window layout,
-optionally its own **git worktree** — and a chat panel talking to its own agent
-session. A sidebar shows every thread with a live status, so you can run
-several agents in parallel and see at a glance which one is working, which one
-is waiting on you, and which one is done.
+## What it does
 
-```
-┌────────────┬──────────────────────────┬────────────────────────────┐
-│ Threads    │           Chat           │            Code            │
-│────────────│──────────────────────────│                            │
-│● ✳ auth-fix│ ❯ You                    │  (normal editing windows,  │
-│? ⬡ refactor│ fix the login bug        │   owned by this thread's   │
-│✓ ✳ docs    │                          │   tab page)                │
-│            │ Looking at the auth      │                            │
-│            │ module…                  │                            │
-│            │ ⏺ Read src/auth.ts       │                            │
-│            │ ⏺ Edit src/auth.ts …     │                            │
-│            │──────────────────────────│                            │
-│            │ > _                      │                            │
-└────────────┴──────────────────────────┴────────────────────────────┘
-```
+The plugin organizes your work into threads. A thread is one conversation with
+one agent, plus its own workspace: its own tab page, its own window layout,
+and optionally its own git worktree. This means you can have several agents
+working on the same repository at the same time without them interfering with
+each other or with your own editing.
+
+Each thread's tab has three columns: a sidebar listing all threads on the
+left, the agent chat in the middle, and your normal editing windows on the
+right.
+
+The sidebar shows a status icon for every thread so you always know what each
+agent is doing:
+
+- `●` the agent is working
+- `?` the agent needs you (a permission request or a question)
+- `✓` the agent is idle or done
+- `✗` something failed
+
+If a background thread needs attention you also get a notification, and
+`require("acp").statusline()` returns a summary string you can put in your
+statusline.
 
 ## Features
 
-- **Any ACP agent, per thread** — Claude Code (`✳`) and Codex (`⬡`) out of the
-  box; add Gemini or anything from the
-  [ACP registry](https://agentclientprotocol.com/get-started/registry).
-  Creating a thread asks which agent it should run, and the sidebar shows the
-  agent's icon next to each thread.
-- **Threads sidebar** — every thread with status icon, agent icon, name, and
-  branch. `●` working · `?` needs your attention · `✓` idle · `✗` error.
-  The cursor snaps to thread lines; the native tabline is hidden (the sidebar
-  *is* the workspace switcher), and switching threads keeps your cursor in the
-  same kind of window — sidebar stays sidebar, code stays code.
-- **Workspace per thread** — one native tab page per thread; buffers, splits,
-  and a tab-local `:tcd` are naturally scoped to it.
-- **Worktree isolation (opt-in)** — a new thread can get its own git worktree
-  (`.worktrees/<slug>`, branch `agents/<slug>`), so parallel agents never step
-  on each other's changes.
-- **Live chat panel** — streamed response chunks, thought chunks, plans, and
-  tool calls that update in place (pending → running → done) with inline diffs.
-- **Native permission prompts** — ACP `session/request_permission` renders in
-  the chat panel with the agent's own options (allow once/always, reject).
-  Threads waiting on a permission flip to `?` and fire a notification.
-- **Editor-aware file access** — the ACP fs capability routes the agent's
-  reads/writes through Neovim: it sees your unsaved buffer contents, and its
-  edits land in your open buffers.
-- **Editor-provided terminals** — agents run commands in terminals we spawn,
-  with live output (and exit status) streaming inside the tool call.
-- **Session config: modes, models, and more** — `gm` in the chat opens the
-  agent's config options (mode, model, thought level, toggles); current
-  mode/model show in the chat winbar. Falls back to the legacy modes API for
-  older agents.
-- **Follow the agent** — `gf` toggles follow mode: the code window jumps to
-  the file/line of each tool call as the agent works (off by default,
-  `ui.follow = true` to default on).
-- **Auto-titled threads** — agents that send session titles rename their
-  thread (manual renames always win; `ui.auto_title = false` to disable).
-- **Good session citizenship** — idle processes get `session/close` before
-  being reaped and revive via lightweight `session/resume` (no replay
-  flicker); deleting a thread also `session/delete`s the agent's stored
-  conversation; `$/cancel_request` is honored for pending permission prompts.
-- **Slash commands** — `/` on an empty input lists the agent's advertised
-  commands with descriptions.
-- **In-editor auth** — if an agent needs authentication, its auth methods are
-  offered in a picker and the session retries after `authenticate`.
-- **True resume** — reopening a thread renders the agent's `session/load`
-  replay as the transcript, so turns made outside Neovim (Zed, the CLI) show
-  up too.
-- **Context chips** — paste lines yanked from a file into the chat input and
-  they collapse to `(file.txt 1-3)`. On send, the chip expands to the
-  *current* content of those lines (unsaved edits included) as an ACP embedded
-  resource, or a fenced code block for agents without that capability.
-- **Persistence** — threads, transcripts, window layouts, and agent session
-  ids survive restarts; conversations resume via ACP `session/load`.
+- One agent process per thread, speaking JSON-RPC over stdio (the ACP wire
+  format). Threads can use different agents: one thread on Claude, another on
+  Codex, picked when the thread is created. The sidebar shows an icon per
+  agent.
+- Optional git worktree per thread. When you create a thread you can choose
+  between the current checkout and a fresh worktree with its own branch, so
+  parallel changes never collide.
+- Streaming chat. Responses, thought chunks, plans, and tool calls render
+  live. Tool calls update in place as they progress and show inline diffs.
+- Permission prompts in the chat. When the agent wants to run something that
+  needs approval, the request appears inline with the agent's own options
+  (allow once, always allow, reject) mapped to keys.
+- File access through the editor. The agent reads and writes files through
+  Neovim, so it sees your unsaved changes and its edits land in your open
+  buffers.
+- Terminals provided by the editor. Agents run commands in terminals the
+  plugin spawns, and the live output streams inside the tool call.
+- Context chips. If you yank lines from a file and paste them into the chat
+  input, they collapse to a token like `(file.txt 1-3)`. When you send the
+  message, the token expands to the current content of those lines.
+- Session config. `gm` opens the agent's config options, such as permission
+  mode and model. The current mode and model are shown above the chat.
+- Slash commands. `/` on an empty input lists the commands the agent
+  advertises.
+- Follow mode. `gf` toggles jumping the code window to the file and line the
+  agent is currently touching.
+- Persistence. Threads, transcripts, layouts, and session ids survive
+  restarting Neovim. Conversations resume through the protocol, including
+  turns that happened outside Neovim.
+- Auto titles. Agents that send a session title rename their thread, unless
+  you renamed it yourself.
+- Authentication in the editor. If an agent requires login, its auth methods
+  are offered in a picker.
 
 ## Requirements
 
-- Neovim **0.10+**
-- Node.js (the default Claude adapter runs via `npx`)
-- An authenticated [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
-  login (or `ANTHROPIC_API_KEY`) for the default agent
-- `git` (for worktree support)
+- Neovim 0.10 or newer
+- Node.js (the default adapters are npm packages run through npx)
+- A logged-in Claude Code (or `ANTHROPIC_API_KEY`) for the Claude agent
+- A logged-in Codex CLI for the Codex agent
+- git, if you want worktree support
 
 ## Install
 
-lazy.nvim:
+With lazy.nvim:
 
 ```lua
 {
@@ -100,32 +85,34 @@ lazy.nvim:
 }
 ```
 
-## Usage
+Run `:checkhealth acp` after installing to verify the setup.
 
-| Command            | Action                                              |
-| ------------------ | --------------------------------------------------- |
-| `:Acp`             | Open the last active thread (or create one)         |
-| `:AcpNew [name]`   | Create a thread (asks: agent, checkout/worktree)    |
-| `:AcpToggleChat`   | Show/hide the chat column in the current thread     |
-| `:AcpInterrupt`    | Interrupt the current thread's turn                 |
-| `:checkhealth acp` | Verify agents/git/nvim setup                        |
+## Commands
 
-**Sidebar**: `⏎` open · `n` new · `d` delete (offers worktree cleanup) · `r` rename.
+- `:Acp` opens the last active thread, or creates one if none exist
+- `:AcpNew [name]` creates a thread, asking for the agent and workspace
+- `:AcpToggleChat` shows or hides the chat column
+- `:AcpInterrupt` interrupts the current thread's turn
 
-**Chat input**: `⏎` send · `C-j` newline · `C-c` interrupt · `C-p`/`C-n` prompt history.
-Pasting (`p`/`P`/`<C-r>`) lines yanked from a file inserts a `(file.txt 1-3)`
-context chip; anything else pastes literally. `gm` opens session config
-(mode/model) · `gf` toggles follow mode · `/` on an empty input picks an
-agent command.
-Permission prompts show their keys inline (typically `y` allow once · `a` always
-allow · `n` reject), answerable from the chat or input window.
+## Keymaps
 
-**Global keymaps** (configurable, `false` to disable):
-`<leader>cc` focus the chat of the current/last thread · `<leader>ct` focus the
-threads sidebar. Both rebuild their panel if it was hidden, and open your last
-thread if you're not in one.
+Global (configurable, set to `false` to disable):
 
-**Statusline**: `require("acp").statusline()` returns e.g. `●2 ?1`.
+- `<leader>cc` focus the chat of the current or last thread
+- `<leader>ct` focus the threads sidebar
+
+Sidebar:
+
+- `Enter` open thread, `n` new, `d` delete, `r` rename
+
+Chat input:
+
+- `Enter` send, `Ctrl-j` newline, `Ctrl-c` interrupt
+- `Ctrl-p` / `Ctrl-n` prompt history
+- `p` / `P` paste (file yanks become context chips)
+- `gm` session config (mode, model), `gf` follow mode
+- `/` on an empty input opens the command picker
+- `y` / `a` / `n` answer permission prompts (keys are shown inline)
 
 ## Configuration
 
@@ -137,45 +124,44 @@ require("acp").setup({
     claude = { cmd = { "npx", "-y", "@agentclientprotocol/claude-agent-acp" }, icon = "✳" },
     codex  = { cmd = { "npx", "-y", "@agentclientprotocol/codex-acp" }, icon = "⬡" },
     -- gemini = { cmd = { "gemini", "--experimental-acp" }, icon = "◆" },
-    -- Each entry may also set `env = { KEY = "value" }`.
+    -- entries may also set env = { KEY = "value" }
   },
   default_agent = "claude",
-  mcp_servers = {},          -- forwarded to every session (ACP mcpServers)
-  idle_timeout = 900,        -- reap idle agent processes (session/load revives them)
+  mcp_servers = {},     -- MCP servers forwarded to every agent session
+  idle_timeout = 900,   -- seconds before an idle agent process is stopped
   ui = {
     sidebar_width = 30,
     chat_width = 64,
     input_height = 5,
-    hide_tabline = true,     -- threads are tabs; the sidebar replaces the tabline
+    hide_tabline = true,     -- threads are tabs, the sidebar replaces the tabline
     focus_on_open = "keep",  -- "keep" | "input" | "code" | "sidebar"
     show_thinking = true,
     show_diffs = true,
     diff_max_lines = 24,
     show_result_meta = true,
+    auto_title = true,
+    follow = false,
   },
   worktrees = {
-    dir = ".worktrees",       -- relative to the repo root (auto-added to .git/info/exclude)
+    dir = ".worktrees",       -- relative to the repo root
     branch_prefix = "agents/",
   },
   persist = { enabled = true, max_transcript = 2000 },
   keymaps = {
-    chat = "<leader>cc",    -- focus chat (false to disable)
-    threads = "<leader>ct", -- focus threads sidebar (false to disable)
+    chat = "<leader>cc",
+    threads = "<leader>ct",
   },
   notify = true,
 })
 ```
 
-## How it works
+Notes:
 
-- One ACP agent process per active thread (JSON-RPC 2.0 over stdio), spawned
-  in the thread's worktree: `initialize` → `session/new` → `session/prompt`.
-- `session/update` notifications drive the transcript (message/thought chunks,
-  tool calls, plans) and a per-thread status state machine.
-- Agent-to-editor requests are served by the plugin: `session/request_permission`
-  becomes an inline prompt, `fs/read_text_file` / `fs/write_text_file` go
-  through your buffers.
-- State lives in `stdpath("data")/acp/<project-hash>.json`, keyed by git root;
-  layouts are captured via `winlayout()` on tab switches and exit. Reopened
-  threads reload their conversation with `session/load` when the agent
-  supports it.
+- Idle agent processes are stopped after `idle_timeout` seconds and revived
+  transparently the next time you use the thread. Nothing is lost.
+- Worktrees live in `.worktrees/<thread-name>` on a branch named
+  `agents/<thread-name>`. Both are configurable. Deleting a thread offers to
+  remove its worktree, with an extra confirmation if it has uncommitted
+  changes.
+- State is stored per project in `stdpath("data")/acp/`, keyed by the git
+  root.
