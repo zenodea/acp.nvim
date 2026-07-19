@@ -41,6 +41,8 @@ function M.show(thread, pending)
       end
     end
   end
+  -- Let the session clear the keymaps when the request is cancelled.
+  pending.clear = clear_maps
 
   for _, k in ipairs(keyed) do
     for _, b in ipairs(bufs) do
