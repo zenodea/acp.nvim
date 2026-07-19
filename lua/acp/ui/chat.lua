@@ -183,6 +183,9 @@ function M.ensure_buf(thread)
       thread.session:interrupt()
     end
   end, "Interrupt agent")
+  map("gm", function()
+    require("acp.agent.session").get(thread):select_mode()
+  end, "Select session mode")
 
   M.replay(thread)
   return buf

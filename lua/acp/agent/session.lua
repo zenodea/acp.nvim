@@ -89,13 +89,16 @@ function Session:open_session()
   if self.thread.session_id and self.caps.loadSession then
     self.loading = true
     local load_params = vim.tbl_extend("force", params, { sessionId = self.thread.session_id })
-    self.rpc:request("session/load", load_params, function(_, err)
+    self.rpc:request("session/load", load_params, function(result, err)
       self.loading = false
       if err then
         -- Stale session on the agent side: fall back to a fresh one.
         self.thread.session_id = nil
         self:open_session()
         return
+      end
+      if result and result.modes then
+        self:set_modes(result.modes)
       end
       self:finish_start(true)
     end)
@@ -110,8 +113,61 @@ function Session:open_session()
       chat().append(self.thread, "meta", "(agent does not support resume — starting a fresh session)")
     end
     self.thread.session_id = result.sessionId
+    self:set_modes(result.modes)
     require("acp.core.registry").emit("state")
     self:finish_start(true)
+  end)
+end
+
+---@param modes {currentModeId: string, availableModes: table[]}|nil
+function Session:set_modes(modes)
+  self.modes = modes
+  require("acp.ui.workspace").update_winbar(self.thread)
+end
+
+---@param mode_id string|nil
+---@return table|nil mode
+function Session:find_mode(mode_id)
+  for _, mode in ipairs((self.modes and self.modes.availableModes) or {}) do
+    if mode.id == mode_id then
+      return mode
+    end
+  end
+end
+
+---@param mode_id string
+function Session:set_mode(mode_id)
+  if not self.rpc or not self.rpc:alive() then
+    return
+  end
+  self.rpc:request("session/set_mode", { sessionId = self.thread.session_id, modeId = mode_id }, function(_, err)
+    if err then
+      chat().append(self.thread, "error", "set mode failed: " .. (err.message or "?"))
+      return
+    end
+    if self.modes then
+      self.modes.currentModeId = mode_id
+    end
+    require("acp.ui.workspace").update_winbar(self.thread)
+  end)
+end
+
+---Pick a session mode via vim.ui.select.
+function Session:select_mode()
+  local available = (self.modes and self.modes.availableModes) or {}
+  if #available == 0 then
+    vim.notify("acp: this agent exposes no session modes", vim.log.levels.INFO)
+    return
+  end
+  local labels = {}
+  for _, mode in ipairs(available) do
+    local current = self.modes.currentModeId == mode.id and " (current)" or ""
+    table.insert(labels, (mode.name or mode.id) .. current)
+  end
+  vim.ui.select(labels, { prompt = "Session mode:" }, function(_, idx)
+    if idx then
+      self:set_mode(available[idx].id)
+    end
   end)
 end
 
@@ -457,9 +513,17 @@ function Session:on_notification(method, params)
     if not chat().update_by_id(self.thread, "plan", text) then
       chat().append(self.thread, "plan", text, "plan")
     end
+  elseif kind == "current_mode_update" then
+    if self.modes then
+      self.modes.currentModeId = u.currentModeId
+    else
+      self.modes = { currentModeId = u.currentModeId, availableModes = {} }
+    end
+    local mode = self:find_mode(u.currentModeId)
+    chat().append(self.thread, "meta", "(mode: " .. ((mode and mode.name) or u.currentModeId) .. ")")
+    require("acp.ui.workspace").update_winbar(self.thread)
   end
-  -- user_message_chunk (load replay), available_commands_update,
-  -- current_mode_update: ignored.
+  -- user_message_chunk (load replay), available_commands_update: ignored.
 end
 
 ---@param code integer

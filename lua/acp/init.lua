@@ -296,13 +296,7 @@ function M.rename(thread)
       return
     end
     thread.name = vim.trim(name)
-    if thread:tab_valid() then
-      for _, win in ipairs(vim.api.nvim_tabpage_list_wins(thread.tabpage)) do
-        if vim.w[win].acp_ui == "chat" then
-          vim.wo[win].winbar = " " .. thread.name
-        end
-      end
-    end
+    workspace().update_winbar(thread)
     registry().emit("threads")
   end)
 end

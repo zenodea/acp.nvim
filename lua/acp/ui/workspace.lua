@@ -32,8 +32,7 @@ function M.build_chat_column(thread)
   vim.wo[chat_win].wrap = true
   vim.wo[chat_win].linebreak = true
   vim.wo[chat_win].winfixwidth = true
-  local agent = thread.agent or require("acp.config").options.default_agent
-  vim.wo[chat_win].winbar = " " .. thread.name .. (agent and (" · " .. agent) or "")
+  M.update_winbar(thread)
 
   vim.cmd("belowright " .. cfg.input_height .. "split")
   local input_win = vim.api.nvim_get_current_win()
@@ -95,6 +94,26 @@ local function build_tab(thread)
   M.build_sidebar()
   M.build_chat_column(thread)
   vim.api.nvim_set_current_win(code_win)
+end
+
+---Refresh the chat winbar: "name · agent [mode]".
+---@param thread Thread
+function M.update_winbar(thread)
+  if not thread:tab_valid() then
+    return
+  end
+  local win = M.find_ui_win(thread.tabpage, "chat")
+  if not win then
+    return
+  end
+  local agent = thread.agent or require("acp.config").options.default_agent
+  local text = " " .. thread.name .. (agent and (" · " .. agent) or "")
+  local session = thread.session
+  if session and session.modes and session.modes.currentModeId then
+    local mode = session:find_mode(session.modes.currentModeId)
+    text = text .. " [" .. ((mode and mode.name) or session.modes.currentModeId) .. "]"
+  end
+  vim.wo[win].winbar = text
 end
 
 ---@param tabpage integer
