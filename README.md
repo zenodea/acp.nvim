@@ -53,9 +53,19 @@ is waiting on you, and which one is done.
   edits land in your open buffers.
 - **Editor-provided terminals** — agents run commands in terminals we spawn,
   with live output (and exit status) streaming inside the tool call.
-- **Session modes** — `gm` in the chat picks the agent's modes (e.g. Claude's
-  default / accept-edits / plan / bypass); the current mode shows in the
-  chat winbar.
+- **Session config: modes, models, and more** — `gm` in the chat opens the
+  agent's config options (mode, model, thought level, toggles); current
+  mode/model show in the chat winbar. Falls back to the legacy modes API for
+  older agents.
+- **Follow the agent** — `gf` toggles follow mode: the code window jumps to
+  the file/line of each tool call as the agent works (off by default,
+  `ui.follow = true` to default on).
+- **Auto-titled threads** — agents that send session titles rename their
+  thread (manual renames always win; `ui.auto_title = false` to disable).
+- **Good session citizenship** — idle processes get `session/close` before
+  being reaped and revive via lightweight `session/resume` (no replay
+  flicker); deleting a thread also `session/delete`s the agent's stored
+  conversation; `$/cancel_request` is honored for pending permission prompts.
 - **Slash commands** — `/` on an empty input lists the agent's advertised
   commands with descriptions.
 - **In-editor auth** — if an agent needs authentication, its auth methods are
@@ -104,8 +114,9 @@ lazy.nvim:
 
 **Chat input**: `⏎` send · `C-j` newline · `C-c` interrupt · `C-p`/`C-n` prompt history.
 Pasting (`p`/`P`/`<C-r>`) lines yanked from a file inserts a `(file.txt 1-3)`
-context chip; anything else pastes literally. `gm` picks the session mode ·
-`/` on an empty input picks an agent command.
+context chip; anything else pastes literally. `gm` opens session config
+(mode/model) · `gf` toggles follow mode · `/` on an empty input picks an
+agent command.
 Permission prompts show their keys inline (typically `y` allow once · `a` always
 allow · `n` reject), answerable from the chat or input window.
 
