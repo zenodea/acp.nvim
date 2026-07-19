@@ -18,7 +18,9 @@ function M.ensure_buf(thread)
     return thread.chat_buf
   end
   local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_buf_set_name(buf, "claude-agents://chat/" .. thread.slug .. "/" .. thread.id)
+  local name = "claude-agents://chat/" .. thread.slug .. "/" .. thread.id
+  require("claude-agents.util").wipe_named_buf(name)
+  vim.api.nvim_buf_set_name(buf, name)
   vim.bo[buf].buftype = "nofile"
   vim.bo[buf].bufhidden = "hide"
   vim.bo[buf].swapfile = false

@@ -59,6 +59,17 @@ function M.git_root(dir)
   return nil
 end
 
+---Delete any existing buffer with this exact name (stale after a thread
+---object is recreated, e.g. on persistence reload).
+---@param name string
+function M.wipe_named_buf(name)
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_get_name(buf) == name then
+      pcall(vim.api.nvim_buf_delete, buf, { force = true })
+    end
+  end
+end
+
 ---Split possibly-multiline text into a list of lines.
 ---@param text string
 ---@return string[]
