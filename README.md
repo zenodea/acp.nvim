@@ -74,6 +74,10 @@ lazy.nvim:
 **Chat input**: `⏎` send · `C-j` newline · `C-c` interrupt · `C-p`/`C-n` prompt history.
 `y`/`n` answer a pending permission request (from the chat or input window).
 
+**Global keymaps** (configurable, `false` to disable):
+`<leader>cc` focus the chat of the current/last thread · `<leader>ct` focus the threads sidebar.
+Both rebuild their panel if it was hidden, and open your last thread if you're not in one.
+
 **Statusline**: `require("claude-agents").statusline()` returns e.g. `●2 ?1`.
 
 ## Configuration
@@ -104,6 +108,10 @@ require("claude-agents").setup({
     branch_prefix = "agents/",
   },
   persist = { enabled = true, max_transcript = 2000 },
+  keymaps = {
+    chat = "<leader>cc",    -- focus chat (false to disable)
+    threads = "<leader>ct", -- focus threads sidebar (false to disable)
+  },
   notify = true,
 })
 ```
