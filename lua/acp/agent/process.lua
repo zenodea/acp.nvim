@@ -1,13 +1,14 @@
 local M = {}
 
 ---Spawn a line-oriented NDJSON process.
----@param opts {args: string[], cwd: string, on_line: fun(line: string), on_exit: fun(code: integer), on_stderr: fun(text: string)|nil}
+---@param opts {args: string[], cwd: string, env: table|nil, on_line: fun(line: string), on_exit: fun(code: integer), on_stderr: fun(text: string)|nil}
 ---@return integer|nil job_id, string|nil err
 function M.spawn(opts)
   local pending = "" -- partial line carried between on_stdout calls
 
   local job = vim.fn.jobstart(opts.args, {
     cwd = opts.cwd,
+    env = opts.env,
     stdin = "pipe",
     on_stdout = function(_, data, _)
       -- data is a list where the first entry continues the previous partial
