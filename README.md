@@ -51,6 +51,18 @@ is waiting on you, and which one is done.
 - **Editor-aware file access** — the ACP fs capability routes the agent's
   reads/writes through Neovim: it sees your unsaved buffer contents, and its
   edits land in your open buffers.
+- **Editor-provided terminals** — agents run commands in terminals we spawn,
+  with live output (and exit status) streaming inside the tool call.
+- **Session modes** — `gm` in the chat picks the agent's modes (e.g. Claude's
+  default / accept-edits / plan / bypass); the current mode shows in the
+  chat winbar.
+- **Slash commands** — `/` on an empty input lists the agent's advertised
+  commands with descriptions.
+- **In-editor auth** — if an agent needs authentication, its auth methods are
+  offered in a picker and the session retries after `authenticate`.
+- **True resume** — reopening a thread renders the agent's `session/load`
+  replay as the transcript, so turns made outside Neovim (Zed, the CLI) show
+  up too.
 - **Context chips** — paste lines yanked from a file into the chat input and
   they collapse to `(file.txt 1-3)`. On send, the chip expands to the
   *current* content of those lines (unsaved edits included) as an ACP embedded
@@ -92,7 +104,8 @@ lazy.nvim:
 
 **Chat input**: `⏎` send · `C-j` newline · `C-c` interrupt · `C-p`/`C-n` prompt history.
 Pasting (`p`/`P`/`<C-r>`) lines yanked from a file inserts a `(file.txt 1-3)`
-context chip; anything else pastes literally.
+context chip; anything else pastes literally. `gm` picks the session mode ·
+`/` on an empty input picks an agent command.
 Permission prompts show their keys inline (typically `y` allow once · `a` always
 allow · `n` reject), answerable from the chat or input window.
 
@@ -116,6 +129,7 @@ require("acp").setup({
     -- Each entry may also set `env = { KEY = "value" }`.
   },
   default_agent = "claude",
+  mcp_servers = {},          -- forwarded to every session (ACP mcpServers)
   idle_timeout = 900,        -- reap idle agent processes (session/load revives them)
   ui = {
     sidebar_width = 30,
