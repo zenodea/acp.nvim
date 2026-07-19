@@ -1,4 +1,4 @@
-local util = require("agent-flow.util")
+local util = require("acp.util")
 
 local M = {}
 
@@ -30,7 +30,7 @@ end
 ---@param slug string
 ---@return {path: string, branch: string}|nil worktree, string|nil err
 function M.create(root, slug)
-  local cfg = require("agent-flow.config").options.worktrees
+  local cfg = require("acp.config").options.worktrees
   local path = root .. "/" .. cfg.dir .. "/" .. slug
   local branch = cfg.branch_prefix .. slug
 

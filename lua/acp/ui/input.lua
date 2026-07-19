@@ -12,7 +12,7 @@ local function send(thread)
   thread.input_history = thread.input_history or {}
   table.insert(thread.input_history, text)
   thread.history_pos = nil
-  require("agent-flow.agent.session").get(thread):send(text)
+  require("acp.agent.session").get(thread):send(text)
 end
 
 ---@param thread Thread
@@ -36,8 +36,8 @@ function M.ensure_buf(thread)
     return thread.input_buf
   end
   local buf = vim.api.nvim_create_buf(false, true)
-  local name = "agent-flow://input/" .. thread.slug .. "/" .. thread.id
-  require("agent-flow.util").wipe_named_buf(name)
+  local name = "acp://input/" .. thread.slug .. "/" .. thread.id
+  require("acp.util").wipe_named_buf(name)
   vim.api.nvim_buf_set_name(buf, name)
   vim.bo[buf].buftype = "nofile"
   vim.bo[buf].bufhidden = "hide"
@@ -74,7 +74,7 @@ function M.focus(thread)
     return
   end
   for _, win in ipairs(vim.api.nvim_tabpage_list_wins(thread.tabpage)) do
-    if vim.w[win].agent_flow_ui == "input" then
+    if vim.w[win].acp_ui == "input" then
       vim.api.nvim_set_current_win(win)
       vim.cmd.startinsert()
       return

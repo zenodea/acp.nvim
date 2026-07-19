@@ -1,14 +1,14 @@
 local M = {}
 
-local ns = vim.api.nvim_create_namespace("agent-flow-chat")
+local ns = vim.api.nvim_create_namespace("acp-chat")
 
 local kind_hl = {
-  user = "AgentFlowChatUser",
-  tool = "AgentFlowChatTool",
-  thinking = "AgentFlowChatThinking",
-  meta = "AgentFlowChatMeta",
-  error = "AgentFlowChatError",
-  permission = "AgentFlowChatPermission",
+  user = "AcpChatUser",
+  tool = "AcpChatTool",
+  thinking = "AcpChatThinking",
+  meta = "AcpChatMeta",
+  error = "AcpChatError",
+  permission = "AcpChatPermission",
 }
 
 ---@param thread Thread
@@ -18,8 +18,8 @@ function M.ensure_buf(thread)
     return thread.chat_buf
   end
   local buf = vim.api.nvim_create_buf(false, true)
-  local name = "agent-flow://chat/" .. thread.slug .. "/" .. thread.id
-  require("agent-flow.util").wipe_named_buf(name)
+  local name = "acp://chat/" .. thread.slug .. "/" .. thread.id
+  require("acp.util").wipe_named_buf(name)
   vim.api.nvim_buf_set_name(buf, name)
   vim.bo[buf].buftype = "nofile"
   vim.bo[buf].bufhidden = "hide"
@@ -32,7 +32,7 @@ function M.ensure_buf(thread)
     vim.keymap.set("n", lhs, fn, { buffer = buf, desc = desc, nowait = true })
   end
   map("i", function()
-    require("agent-flow.ui.input").focus(thread)
+    require("acp.ui.input").focus(thread)
   end, "Focus message input")
   map("<C-c>", function()
     if thread.session then
@@ -83,7 +83,7 @@ end
 ---@param kind string
 ---@param text string
 local function render_entry(buf, kind, text)
-  local icons = require("agent-flow.config").options.ui.icons
+  local icons = require("acp.config").options.ui.icons
   local lines = entry_lines(icons, kind, text)
   vim.bo[buf].modifiable = true
   local start = vim.api.nvim_buf_line_count(buf)
@@ -104,16 +104,16 @@ local function render_entry(buf, kind, text)
     end
   elseif kind == "meta" then
     for i = 0, #lines - 1 do
-      vim.api.nvim_buf_set_extmark(buf, ns, start + i, 0, { line_hl_group = "AgentFlowChatMeta", priority = 90 })
+      vim.api.nvim_buf_set_extmark(buf, ns, start + i, 0, { line_hl_group = "AcpChatMeta", priority = 90 })
     end
   end
   if kind == "meta" then
     -- Colorize diff-ish meta lines rendered for Edit/Write tool calls.
     for i, l in ipairs(lines) do
       if l:sub(1, 2) == "+ " then
-        vim.api.nvim_buf_set_extmark(buf, ns, start + i - 1, 0, { line_hl_group = "AgentFlowDiffAdd", priority = 95 })
+        vim.api.nvim_buf_set_extmark(buf, ns, start + i - 1, 0, { line_hl_group = "AcpDiffAdd", priority = 95 })
       elseif l:sub(1, 2) == "- " then
-        vim.api.nvim_buf_set_extmark(buf, ns, start + i - 1, 0, { line_hl_group = "AgentFlowDiffDelete", priority = 95 })
+        vim.api.nvim_buf_set_extmark(buf, ns, start + i - 1, 0, { line_hl_group = "AcpDiffDelete", priority = 95 })
       end
     end
   end
@@ -141,7 +141,7 @@ function M.append(thread, kind, text)
   local buf = M.ensure_buf(thread)
   render_entry(buf, kind, text)
   autoscroll(buf)
-  require("agent-flow.persist.store").save_debounced()
+  require("acp.persist.store").save_debounced()
 end
 
 ---Re-render the whole transcript into the chat buffer (used on restore).

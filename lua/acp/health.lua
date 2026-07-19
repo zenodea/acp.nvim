@@ -2,10 +2,10 @@ local M = {}
 
 function M.check()
   local health = vim.health
-  local util = require("agent-flow.util")
-  local cfg = require("agent-flow.config").options
+  local util = require("acp.util")
+  local cfg = require("acp.config").options
 
-  health.start("agent-flow")
+  health.start("acp")
 
   if vim.fn.has("nvim-0.10") == 1 then
     health.ok("Neovim >= 0.10")

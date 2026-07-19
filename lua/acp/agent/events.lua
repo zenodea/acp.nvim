@@ -1,4 +1,4 @@
-local util = require("agent-flow.util")
+local util = require("acp.util")
 
 local M = {}
 
@@ -51,7 +51,7 @@ end
 ---@param input table
 ---@return string[] lines
 function M.tool_diff(name, input)
-  local cfg = require("agent-flow.config").options.ui
+  local cfg = require("acp.config").options.ui
   local lines = {}
   local function push(prefix, text)
     for _, l in ipairs(util.lines(text or "")) do
