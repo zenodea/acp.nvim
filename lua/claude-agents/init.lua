@@ -112,6 +112,18 @@ function M.setup(opts)
   registry().on("state", function()
     store().save_debounced()
   end)
+
+  local keymaps = require("claude-agents.config").options.keymaps or {}
+  if keymaps.chat then
+    vim.keymap.set("n", keymaps.chat, function()
+      M.focus_chat()
+    end, { desc = "Claude Agents: focus chat" })
+  end
+  if keymaps.threads then
+    vim.keymap.set("n", keymaps.threads, function()
+      M.focus_threads()
+    end, { desc = "Claude Agents: focus threads sidebar" })
+  end
 end
 
 local function ensure_setup()
@@ -268,6 +280,53 @@ end
 function M.toggle_chat()
   ensure_setup()
   workspace().toggle_chat()
+end
+
+---Thread of the current tab, falling back to opening the last active one.
+---@return Thread|nil
+local function current_or_last_thread()
+  local thread = registry().find_by_tab(vim.api.nvim_get_current_tabpage())
+  if thread then
+    return thread
+  end
+  thread = registry().last_active_thread()
+  if not thread then
+    M.new()
+    return nil
+  end
+  workspace().open(thread)
+  return thread
+end
+
+---Focus the chat input of the current (or last active) thread, building the
+---chat column if it was hidden.
+function M.focus_chat()
+  ensure_setup()
+  local thread = current_or_last_thread()
+  if not thread then
+    return
+  end
+  if not workspace().find_ui_win(thread.tabpage, "chat") then
+    workspace().build_chat_column(thread)
+  end
+  require("claude-agents.ui.input").focus(thread)
+end
+
+---Focus the threads sidebar of the current (or last active) thread's tab.
+function M.focus_threads()
+  ensure_setup()
+  local thread = current_or_last_thread()
+  if not thread then
+    return
+  end
+  local win = workspace().find_ui_win(thread.tabpage, "sidebar")
+  if not win then
+    workspace().build_sidebar()
+    win = workspace().find_ui_win(thread.tabpage, "sidebar")
+  end
+  if win then
+    vim.api.nvim_set_current_win(win)
+  end
 end
 
 ---Interrupt the thread of the current tab.

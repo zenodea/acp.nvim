@@ -42,8 +42,8 @@ function M.build_chat_column(thread)
   pcall(vim.api.nvim_win_set_cursor, chat_win, { last, 0 })
 end
 
----@param thread Thread
-local function build_sidebar(thread)
+---Build the threads sidebar window on the left of the current tab.
+function M.build_sidebar()
   local cfg = require("claude-agents.config").options.ui
   local buf = require("claude-agents.ui.sidebar").ensure_buf()
   vim.cmd("topleft " .. cfg.sidebar_width .. "vsplit")
@@ -70,20 +70,22 @@ local function build_tab(thread)
 
   vim.api.nvim_set_current_win(code_win)
   M.build_chat_column(thread)
-  build_sidebar(thread)
+  M.build_sidebar()
   vim.api.nvim_set_current_win(code_win)
 end
 
 ---@param tabpage integer
 ---@param role string
 ---@return integer|nil win
-local function find_ui_win(tabpage, role)
+function M.find_ui_win(tabpage, role)
   for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
     if vim.w[win].claude_agents_ui == role then
       return win
     end
   end
 end
+
+local find_ui_win = M.find_ui_win
 
 ---Open (or focus) a thread's workspace tab.
 ---@param thread Thread

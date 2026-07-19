@@ -52,6 +52,12 @@ M.defaults = {
     max_transcript = 2000,
   },
 
+  -- Global keymaps (set a value to false to disable it).
+  keymaps = {
+    chat = "<leader>cc", -- focus the chat of the current (or last) thread
+    threads = "<leader>ct", -- focus the threads sidebar
+  },
+
   -- vim.notify when a background thread needs attention / finishes.
   notify = true,
 }
