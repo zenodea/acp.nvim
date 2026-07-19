@@ -193,10 +193,23 @@ function Session:set_config_option(config_id, value)
   )
 end
 
----Config-option picker (gm). Falls back to the deprecated modes API for
----agents that don't expose config options yet.
-function Session:select_config()
+---Config-option picker (gm). Starts the session on demand (options only
+---exist once session/new has run) and falls back to the deprecated modes
+---API for agents that don't expose config options.
+---@param retried boolean|nil internal: set after an on-demand session start
+function Session:select_config(retried)
   local options = self.config_options or {}
+  if #options == 0 and not retried and not (self.ready and self.rpc and self.rpc:alive()) then
+    vim.notify("acp: starting agent session…", vim.log.levels.INFO)
+    self:ensure_started(function(ok)
+      if ok then
+        vim.schedule(function()
+          self:select_config(true)
+        end)
+      end
+    end)
+    return
+  end
   if #options == 0 then
     self:select_mode()
     return
@@ -307,7 +320,7 @@ end
 function Session:select_mode()
   local available = (self.modes and self.modes.availableModes) or {}
   if #available == 0 then
-    vim.notify("acp: this agent exposes no session modes", vim.log.levels.INFO)
+    vim.notify("acp: this agent exposes no config options or modes", vim.log.levels.INFO)
     return
   end
   local labels = {}
