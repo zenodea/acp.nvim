@@ -53,6 +53,7 @@ function M.build_sidebar()
   mark(win, "sidebar")
   vim.wo[win].winfixwidth = true
   vim.wo[win].cursorline = true
+  require("acp.ui.sidebar").snap()
 end
 
 ---@param thread Thread
