@@ -92,6 +92,10 @@ function M.setup(opts)
 
   require("acp.ui.highlights").setup()
 
+  if require("acp.config").options.ui.hide_tabline then
+    vim.o.showtabline = 0
+  end
+
   local util = require("acp.util")
   local cwd = vim.fn.getcwd()
   registry().root = util.git_root(cwd) or cwd

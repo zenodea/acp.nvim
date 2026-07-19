@@ -12,14 +12,20 @@ local function mark(win, role)
   vim.wo[win].spell = false
 end
 
----Build the chat column (chat + input) on the right of the current tab.
+---Build the chat column (chat + input) next to the sidebar (or far left).
 ---@param thread Thread
 function M.build_chat_column(thread)
   local cfg = require("acp.config").options.ui
   local chat_buf = require("acp.ui.chat").ensure_buf(thread)
   local input_buf = require("acp.ui.input").ensure_buf(thread)
 
-  vim.cmd("botright " .. cfg.chat_width .. "vsplit")
+  local sidebar_win = M.find_ui_win(vim.api.nvim_get_current_tabpage(), "sidebar")
+  if sidebar_win then
+    vim.api.nvim_set_current_win(sidebar_win)
+    vim.cmd("rightbelow " .. cfg.chat_width .. "vsplit")
+  else
+    vim.cmd("topleft " .. cfg.chat_width .. "vsplit")
+  end
   local chat_win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_buf(chat_win, chat_buf)
   mark(chat_win, "chat")
@@ -41,6 +47,12 @@ function M.build_chat_column(thread)
   -- Keep the transcript pinned to the bottom initially.
   local last = vim.api.nvim_buf_line_count(chat_buf)
   pcall(vim.api.nvim_win_set_cursor, chat_win, { last, 0 })
+
+  -- Splitting the sidebar redistributes widths; restore them.
+  if sidebar_win and vim.api.nvim_win_is_valid(sidebar_win) then
+    vim.api.nvim_win_set_width(sidebar_win, cfg.sidebar_width)
+  end
+  vim.api.nvim_win_set_width(chat_win, cfg.chat_width)
 end
 
 ---Build the threads sidebar window on the left of the current tab.
@@ -64,15 +76,16 @@ local function build_tab(thread)
     vim.cmd("tcd " .. vim.fn.fnameescape(thread.cwd))
   end
 
-  -- Center: restore the persisted code layout into the initial window.
+  -- Right: restore the persisted code layout into the initial window.
   local code_win = vim.api.nvim_get_current_win()
   if thread.layout then
     require("acp.persist.layout").restore(thread.layout)
   end
 
+  -- Column order: sidebar | chat | code.
   vim.api.nvim_set_current_win(code_win)
-  M.build_chat_column(thread)
   M.build_sidebar()
+  M.build_chat_column(thread)
   vim.api.nvim_set_current_win(code_win)
 end
 
@@ -89,10 +102,22 @@ end
 
 local find_ui_win = M.find_ui_win
 
+---First non-plugin window of a tab (the code area).
+---@param tabpage integer
+---@return integer|nil
+local function find_code_win(tabpage)
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
+    if not vim.w[win].acp_ui then
+      return win
+    end
+  end
+end
+
 ---Open (or focus) a thread's workspace tab.
 ---@param thread Thread
 function M.open(thread)
   local registry = require("acp.core.registry")
+  local from_role = vim.w[vim.api.nvim_get_current_win()].acp_ui or "code"
   if thread:tab_valid() then
     vim.api.nvim_set_current_tabpage(thread.tabpage)
   else
@@ -103,13 +128,22 @@ function M.open(thread)
   registry.emit("state")
 
   local focus = require("acp.config").options.ui.focus_on_open
+  if focus == "keep" then
+    focus = from_role
+  end
   if focus == "input" then
     require("acp.ui.input").focus(thread)
-  elseif focus == "sidebar" then
-    local win = find_ui_win(thread.tabpage, "sidebar")
-    if win then
-      vim.api.nvim_set_current_win(win)
-    end
+    return
+  end
+  local win
+  if focus == "code" then
+    win = find_code_win(thread.tabpage)
+  else
+    win = find_ui_win(thread.tabpage, focus)
+  end
+  win = win or find_code_win(thread.tabpage)
+  if win then
+    vim.api.nvim_set_current_win(win)
   end
 end
 
