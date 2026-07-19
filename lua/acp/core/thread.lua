@@ -54,6 +54,7 @@ function Thread.from_state(data)
   self.id = data.id
   self.name = data.name
   self.agent = data.agent
+  self.manual_name = data.manual_name
   self.slug = data.slug
   -- A restored thread is never mid-turn; keep attention/error, downgrade working.
   self.status = data.status == "working" and "idle" or (data.status or "idle")
@@ -80,6 +81,7 @@ function Thread:to_state()
     id = self.id,
     name = self.name,
     agent = self.agent,
+    manual_name = self.manual_name,
     slug = self.slug,
     status = self.status,
     status_detail = self.status_detail,

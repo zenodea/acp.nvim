@@ -39,6 +39,9 @@ M.defaults = {
     show_diffs = true, -- render diffs from tool-call content
     diff_max_lines = 24, -- truncate rendered diffs beyond this
     show_result_meta = true, -- "── done · 12s" line after each turn
+    -- Rename threads from the agent's session title (session_info_update);
+    -- manual renames always win.
+    auto_title = true,
     icons = {
       working = "●",
       attention = "?",

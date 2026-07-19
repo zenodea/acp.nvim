@@ -299,6 +299,7 @@ function M.rename(thread)
       return
     end
     thread.name = vim.trim(name)
+    thread.manual_name = true
     workspace().update_winbar(thread)
     registry().emit("threads")
   end)
