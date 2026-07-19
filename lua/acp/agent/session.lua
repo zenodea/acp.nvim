@@ -237,7 +237,7 @@ end
 ---@param err table|nil
 function Session:on_turn_end(result, err)
   self.busy = false
-  self.pending_permission = nil
+  self:cancel_pending_permission()
   chat().close_stream(self.thread)
   local cfg = require("acp.config").options
 
@@ -278,8 +278,24 @@ function Session:on_turn_end(result, err)
   end
 end
 
+---Answer an outstanding permission request with "cancelled" (the spec
+---requires every session/request_permission to be answered) and drop its
+---keymaps.
+function Session:cancel_pending_permission()
+  local pending = self.pending_permission
+  if not pending then
+    return
+  end
+  self.pending_permission = nil
+  if pending.clear then
+    pcall(pending.clear)
+  end
+  pcall(pending.respond, { outcome = { outcome = "cancelled" } })
+end
+
 function Session:interrupt()
   if self.busy and self.rpc and self.rpc:alive() then
+    self:cancel_pending_permission()
     self.rpc:notify("session/cancel", { sessionId = self.thread.session_id })
   end
 end
@@ -407,7 +423,7 @@ function Session:on_exit(code)
   self.ready = false
   local was_busy = self.busy
   self.busy = false
-  self.pending_permission = nil
+  self:cancel_pending_permission()
   self.tool_calls = {}
   if self.starting then
     self:fail_start({ message = "agent exited during startup (code " .. code .. ")" }, "agent exited")
@@ -442,6 +458,7 @@ function Session:schedule_reap()
 end
 
 function Session:stop()
+  self:cancel_pending_permission()
   if self.rpc then
     self.rpc:kill()
     self.rpc = nil
@@ -451,7 +468,6 @@ function Session:stop()
   self.busy = false
   self.queue = {}
   self.start_waiters = {}
-  self.pending_permission = nil
 end
 
 ---@param thread Thread
