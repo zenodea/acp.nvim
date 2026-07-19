@@ -106,6 +106,11 @@ function Session:open_session()
   end
   self.rpc:request("session/new", params, function(result, err)
     if err or not result or not result.sessionId then
+      -- Offer the agent's auth methods once, then retry.
+      if not self.auth_attempted and #(self.auth_methods or {}) > 0 then
+        self:try_authenticate(err)
+        return
+      end
       self:fail_start(err, "session/new failed (is the agent authenticated?)")
       return
     end
@@ -116,6 +121,38 @@ function Session:open_session()
     self:set_modes(result.modes)
     require("acp.core.registry").emit("state")
     self:finish_start(true)
+  end)
+end
+
+---Run the ACP authenticate flow: pick one of the agent's advertised auth
+---methods, call `authenticate`, then retry opening the session.
+---@param orig_err table|nil the session/new error that triggered this
+function Session:try_authenticate(orig_err)
+  self.auth_attempted = true
+  local methods = self.auth_methods
+  chat().append(
+    self.thread,
+    "meta",
+    "(authentication required" .. ((orig_err and orig_err.message) and (": " .. orig_err.message) or "") .. ")"
+  )
+  local labels = {}
+  for _, m in ipairs(methods) do
+    labels[#labels + 1] = (m.name or m.id)
+      .. ((m.description and m.description ~= "") and (" — " .. m.description) or "")
+  end
+  vim.ui.select(labels, { prompt = "Authenticate with:" }, function(_, idx)
+    if not idx then
+      self:fail_start(orig_err, "authentication cancelled")
+      return
+    end
+    self.rpc:request("authenticate", { methodId = methods[idx].id }, function(_, aerr)
+      if aerr then
+        self:fail_start(aerr, "authentication failed")
+        return
+      end
+      chat().append(self.thread, "meta", "(authenticated via " .. (methods[idx].name or methods[idx].id) .. ")")
+      self:open_session()
+    end)
   end)
 end
 
@@ -244,6 +281,8 @@ function Session:ensure_started(cb)
       return
     end
     self.caps = result.agentCapabilities or {}
+    self.auth_methods = result.authMethods or {}
+    self.auth_attempted = false
     self:open_session()
   end)
 end
