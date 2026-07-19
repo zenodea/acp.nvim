@@ -1,4 +1,4 @@
-local util = require("claude-agents.util")
+local util = require("agent-flow.util")
 
 ---@alias ThreadStatus "idle"|"working"|"attention"|"error"
 
@@ -69,7 +69,7 @@ end
 ---Plain-table snapshot for persistence.
 ---@return table
 function Thread:to_state()
-  local max = require("claude-agents.config").options.persist.max_transcript
+  local max = require("agent-flow.config").options.persist.max_transcript
   local transcript = self.transcript
   if #transcript > max then
     transcript = vim.list_slice(transcript, #transcript - max + 1, #transcript)
@@ -100,7 +100,7 @@ function Thread:set_status(status, detail)
   self.status = status
   self.status_detail = detail
   self.last_active = os.time()
-  require("claude-agents.core.registry").emit("status", self, old)
+  require("agent-flow.core.registry").emit("status", self, old)
 end
 
 ---@return boolean

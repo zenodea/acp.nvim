@@ -3,21 +3,21 @@ local M = {}
 local did_setup = false
 
 local function registry()
-  return require("claude-agents.core.registry")
+  return require("agent-flow.core.registry")
 end
 
 local function workspace()
-  return require("claude-agents.ui.workspace")
+  return require("agent-flow.ui.workspace")
 end
 
 local function store()
-  return require("claude-agents.persist.store")
+  return require("agent-flow.persist.store")
 end
 
 ---@param thread Thread
 ---@param old ThreadStatus
 local function notify_status(thread, old)
-  if not require("claude-agents.config").options.notify then
+  if not require("agent-flow.config").options.notify then
     return
   end
   -- Only notify for threads you are not currently looking at.
@@ -26,16 +26,16 @@ local function notify_status(thread, old)
   end
   local name = thread.name
   if thread.status == "attention" then
-    vim.notify(("claude-agents: %s needs attention (%s)"):format(name, thread.status_detail or "waiting"), vim.log.levels.WARN)
+    vim.notify(("agent-flow: %s needs attention (%s)"):format(name, thread.status_detail or "waiting"), vim.log.levels.WARN)
   elseif thread.status == "error" then
-    vim.notify(("claude-agents: %s failed (%s)"):format(name, thread.status_detail or "error"), vim.log.levels.ERROR)
+    vim.notify(("agent-flow: %s failed (%s)"):format(name, thread.status_detail or "error"), vim.log.levels.ERROR)
   elseif thread.status == "idle" and old == "working" then
-    vim.notify(("claude-agents: %s is done"):format(name), vim.log.levels.INFO)
+    vim.notify(("agent-flow: %s is done"):format(name), vim.log.levels.INFO)
   end
 end
 
 local function setup_autocmds()
-  local group = vim.api.nvim_create_augroup("ClaudeAgents", { clear = true })
+  local group = vim.api.nvim_create_augroup("AgentFlow", { clear = true })
 
   vim.api.nvim_create_autocmd("TabLeave", {
     group = group,
@@ -68,7 +68,7 @@ local function setup_autocmds()
         if t:tab_valid() then
           workspace().capture_layout(t)
         end
-        require("claude-agents.agent.session").stop(t)
+        require("agent-flow.agent.session").stop(t)
       end
       store().save()
     end,
@@ -77,29 +77,29 @@ local function setup_autocmds()
   vim.api.nvim_create_autocmd("ColorScheme", {
     group = group,
     callback = function()
-      require("claude-agents.ui.highlights").setup()
+      require("agent-flow.ui.highlights").setup()
     end,
   })
 end
 
 ---@param opts table|nil
 function M.setup(opts)
-  require("claude-agents.config").setup(opts)
+  require("agent-flow.config").setup(opts)
   if did_setup then
     return
   end
   did_setup = true
 
-  require("claude-agents.ui.highlights").setup()
+  require("agent-flow.ui.highlights").setup()
 
-  local util = require("claude-agents.util")
+  local util = require("agent-flow.util")
   local cwd = vim.fn.getcwd()
   registry().root = util.git_root(cwd) or cwd
 
   store().load()
   setup_autocmds()
 
-  local sidebar = require("claude-agents.ui.sidebar")
+  local sidebar = require("agent-flow.ui.sidebar")
   registry().on("status", function(thread, old)
     sidebar.render()
     store().save_debounced()
@@ -113,16 +113,16 @@ function M.setup(opts)
     store().save_debounced()
   end)
 
-  local keymaps = require("claude-agents.config").options.keymaps or {}
+  local keymaps = require("agent-flow.config").options.keymaps or {}
   if keymaps.chat then
     vim.keymap.set("n", keymaps.chat, function()
       M.focus_chat()
-    end, { desc = "Claude Agents: focus chat" })
+    end, { desc = "Agent Flow: focus chat" })
   end
   if keymaps.threads then
     vim.keymap.set("n", keymaps.threads, function()
       M.focus_threads()
-    end, { desc = "Claude Agents: focus threads sidebar" })
+    end, { desc = "Agent Flow: focus threads sidebar" })
   end
 end
 
@@ -136,8 +136,8 @@ end
 ---@param name string
 ---@return string
 local function unique_slug(name)
-  local util = require("claude-agents.util")
-  local cfg = require("claude-agents.config").options.worktrees
+  local util = require("agent-flow.util")
+  local cfg = require("agent-flow.config").options.worktrees
   local base = util.slugify(name)
   local slug = base
   local n = 1
@@ -152,16 +152,16 @@ end
 ---@param name string
 ---@param use_worktree boolean
 local function create_thread(name, use_worktree)
-  local Thread = require("claude-agents.core.thread")
+  local Thread = require("agent-flow.core.thread")
   local root = registry().root
   local slug = unique_slug(name)
 
   local wt = nil
   if use_worktree then
     local err
-    wt, err = require("claude-agents.core.worktree").create(root, slug)
+    wt, err = require("agent-flow.core.worktree").create(root, slug)
     if not wt then
-      vim.notify("claude-agents: worktree creation failed: " .. (err or "?"), vim.log.levels.ERROR)
+      vim.notify("agent-flow: worktree creation failed: " .. (err or "?"), vim.log.levels.ERROR)
       return
     end
   end
@@ -181,7 +181,7 @@ function M.new(name)
       return
     end
     n = vim.trim(n)
-    if require("claude-agents.util").git_root(registry().root) then
+    if require("agent-flow.util").git_root(registry().root) then
       vim.ui.select(
         { "Current checkout", "New worktree (isolated branch)" },
         { prompt = "Workspace for '" .. n .. "':" },
@@ -204,7 +204,7 @@ function M.new(name)
   end
 end
 
----Open the sidebar / last active thread (entry point for :ClaudeAgents).
+---Open the sidebar / last active thread (entry point for :AgentFlow).
 function M.open()
   ensure_setup()
   local thread = registry().last_active_thread()
@@ -227,11 +227,11 @@ function M.delete(thread)
   if vim.fn.confirm("Delete thread '" .. thread.name .. "'?", "&Yes\n&No", 2) ~= 1 then
     return
   end
-  require("claude-agents.agent.session").stop(thread)
+  require("agent-flow.agent.session").stop(thread)
   workspace().close(thread)
 
   if thread.worktree then
-    local wt_mod = require("claude-agents.core.worktree")
+    local wt_mod = require("agent-flow.core.worktree")
     local choice = vim.fn.confirm(
       "Remove worktree " .. thread.worktree.path .. " (branch " .. thread.worktree.branch .. ")?",
       "&Yes\n&No",
@@ -242,13 +242,13 @@ function M.delete(thread)
       if wt_mod.is_dirty(thread.worktree) then
         force = vim.fn.confirm("Worktree has uncommitted changes. Remove anyway?", "&Yes\n&No", 2) == 1
         if not force then
-          vim.notify("claude-agents: kept worktree " .. thread.worktree.path, vim.log.levels.INFO)
+          vim.notify("agent-flow: kept worktree " .. thread.worktree.path, vim.log.levels.INFO)
         end
       end
       if force or not wt_mod.is_dirty(thread.worktree) then
         local ok, err = wt_mod.remove(registry().root, thread.worktree, force)
         if not ok then
-          vim.notify("claude-agents: worktree removal failed: " .. (err or "?"), vim.log.levels.ERROR)
+          vim.notify("agent-flow: worktree removal failed: " .. (err or "?"), vim.log.levels.ERROR)
         end
       end
     end
@@ -268,7 +268,7 @@ function M.rename(thread)
     thread.name = vim.trim(name)
     if thread:tab_valid() then
       for _, win in ipairs(vim.api.nvim_tabpage_list_wins(thread.tabpage)) do
-        if vim.w[win].claude_agents_ui == "chat" then
+        if vim.w[win].agent_flow_ui == "chat" then
           vim.wo[win].winbar = " " .. thread.name
         end
       end
@@ -309,7 +309,7 @@ function M.focus_chat()
   if not workspace().find_ui_win(thread.tabpage, "chat") then
     workspace().build_chat_column(thread)
   end
-  require("claude-agents.ui.input").focus(thread)
+  require("agent-flow.ui.input").focus(thread)
 end
 
 ---Focus the threads sidebar of the current (or last active) thread's tab.
@@ -344,7 +344,7 @@ function M.statusline()
   if not did_setup or #registry().threads == 0 then
     return ""
   end
-  local icons = require("claude-agents.config").options.ui.icons
+  local icons = require("agent-flow.config").options.ui.icons
   local counts = registry().status_counts()
   local parts = {}
   for _, status in ipairs({ "working", "attention", "error" }) do

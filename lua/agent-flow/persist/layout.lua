@@ -6,7 +6,7 @@ local function capture_node(node)
   local kind = node[1]
   if kind == "leaf" then
     local win = node[2]
-    if not vim.api.nvim_win_is_valid(win) or vim.w[win].claude_agents_ui then
+    if not vim.api.nvim_win_is_valid(win) or vim.w[win].agent_flow_ui then
       return nil
     end
     local buf = vim.api.nvim_win_get_buf(win)
