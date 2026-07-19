@@ -726,15 +726,33 @@ function Session:schedule_reap()
   self.reap_marker = marker
   vim.defer_fn(function()
     if self.reap_marker == marker and not self.busy and self.rpc and self.rpc:alive() then
-      self.rpc:kill()
-      self.rpc = nil
-      self.ready = false
+      -- Close gracefully so the agent can persist state, then kill.
+      local rpc = self.rpc
+      rpc:request("session/close", { sessionId = self.thread.session_id })
+      vim.defer_fn(function()
+        if self.rpc == rpc then
+          rpc:kill()
+          self.rpc = nil
+          self.ready = false
+        end
+      end, 200)
     end
   end, timeout * 1000)
 end
 
+---Ask the agent to delete its stored session (thread deletion). Best-effort:
+---only possible while the process is alive; errors are ignored.
+function Session:delete_remote()
+  if self.rpc and self.rpc:alive() and self.thread.session_id then
+    self.rpc:request("session/delete", { sessionId = self.thread.session_id })
+  end
+end
+
 function Session:stop()
   self:cancel_pending_permission()
+  if self.rpc and self.rpc:alive() and self.ready and self.thread.session_id then
+    self.rpc:request("session/close", { sessionId = self.thread.session_id })
+  end
   if self.rpc then
     self.rpc:kill()
     self.rpc = nil
