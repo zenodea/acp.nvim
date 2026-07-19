@@ -681,6 +681,13 @@ function Session:on_notification(method, params)
     self.commands = u.availableCommands or {}
   elseif kind == "config_option_update" then
     self:set_config_options(u.configOptions)
+  elseif kind == "session_info_update" then
+    local title = u.title
+    if cfg.auto_title and not self.thread.manual_name and type(title) == "string" and title ~= "" and title ~= self.thread.name then
+      self.thread.name = title
+      require("acp.core.registry").emit("threads")
+      require("acp.ui.workspace").update_winbar(self.thread)
+    end
   elseif kind == "current_mode_update" then
     if self.modes then
       self.modes.currentModeId = u.currentModeId
