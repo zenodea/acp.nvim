@@ -25,6 +25,7 @@ function M.spawn(opts)
   local self = setmetatable({
     job = nil,
     pending = {},
+    incoming = {}, -- id -> {respond, method} for agent->client requests
     next_id = 0,
     handlers = opts.handlers,
   }, Rpc)
@@ -64,11 +65,12 @@ function Rpc:on_line(line)
   if msg.method and msg.id ~= nil then
     -- Incoming request from the agent; must be answered exactly once.
     local answered = false
-    self.handlers.on_request(msg.method, msg.params, function(result, err)
+    local respond = function(result, err)
       if answered then
         return
       end
       answered = true
+      self.incoming[msg.id] = nil
       if err then
         self:send({ jsonrpc = "2.0", id = msg.id, error = err })
       else
@@ -77,7 +79,19 @@ function Rpc:on_line(line)
         end
         self:send({ jsonrpc = "2.0", id = msg.id, result = result })
       end
-    end)
+    end
+    self.incoming[msg.id] = { respond = respond, method = msg.method }
+    self.handlers.on_request(msg.method, msg.params, respond)
+  elseif msg.method == "$/cancel_request" then
+    -- The agent no longer wants an answer to one of its requests.
+    local id = msg.params and (msg.params.requestId or msg.params.id)
+    local entry = id ~= nil and self.incoming[id] or nil
+    if entry then
+      entry.respond(nil, { code = -32800, message = "request cancelled" })
+      if self.handlers.on_request_cancelled then
+        pcall(self.handlers.on_request_cancelled, entry.method)
+      end
+    end
   elseif msg.method then
     self.handlers.on_notification(msg.method, msg.params)
   elseif msg.id ~= nil then
