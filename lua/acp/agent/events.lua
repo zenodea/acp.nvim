@@ -48,6 +48,11 @@ function M.tool_content_lines(content)
       push("+ ", item.newText)
     elseif item.type == "terminal" and item.terminalId then
       vim.list_extend(lines, require("acp.agent.terminal").render_lines(item.terminalId, cfg.diff_max_lines))
+    elseif item.type == "content" then
+      local text = M.content_text(item.content)
+      if text ~= "" then
+        push("  ", text)
+      end
     end
   end
   if #lines > cfg.diff_max_lines then
