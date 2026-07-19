@@ -64,6 +64,36 @@ function M.ensure_buf(thread)
   vim.keymap.set("n", "<C-n>", function()
     history(thread, 1)
   end, opts("Next prompt"))
+
+  -- Pasting lines yanked from a file inserts a context chip like
+  -- "(file.txt 1-3)" instead of the raw text (expanded at send time).
+  local function paste(after)
+    local reg = vim.v.register
+    local chip = require("acp.context").chip_for(vim.fn.getreg(reg))
+    if chip then
+      vim.api.nvim_put({ chip }, "c", after, true)
+    else
+      vim.cmd('normal! "' .. reg .. (after and "p" or "P"))
+    end
+  end
+  vim.keymap.set("n", "p", function()
+    paste(true)
+  end, opts("Paste (chips file yanks)"))
+  vim.keymap.set("n", "P", function()
+    paste(false)
+  end, opts("Paste before (chips file yanks)"))
+  vim.keymap.set("i", "<C-r>", function()
+    local okc, reg = pcall(vim.fn.getcharstr)
+    if not okc or not reg or #reg ~= 1 then
+      return
+    end
+    local chip = require("acp.context").chip_for(vim.fn.getreg(reg))
+    if chip then
+      vim.api.nvim_put({ chip }, "c", false, true)
+    else
+      vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-r>" .. reg, true, false, true), "n", false)
+    end
+  end, opts("Insert register (chips file yanks)"))
   return buf
 end
 

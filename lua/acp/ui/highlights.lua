@@ -17,6 +17,7 @@ function M.setup()
     AcpChatPermission = "DiagnosticWarn",
     AcpDiffAdd = "DiffAdd",
     AcpDiffDelete = "DiffDelete",
+    AcpChip = "Special",
   }
   for group, link in pairs(links) do
     vim.api.nvim_set_hl(0, group, { link = link, default = true })
