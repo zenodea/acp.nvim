@@ -85,7 +85,10 @@ end
 
 ---Create (or load) the ACP session after initialize.
 function Session:open_session()
-  local params = { cwd = self.thread.cwd, mcpServers = {} }
+  local params = {
+    cwd = self.thread.cwd,
+    mcpServers = require("acp.config").options.mcp_servers or {},
+  }
   if self.thread.session_id and self.caps.loadSession then
     self.loading = true
     -- The load replay becomes the transcript (it is the agent's source of
