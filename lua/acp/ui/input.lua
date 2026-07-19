@@ -65,8 +65,8 @@ function M.ensure_buf(thread)
     history(thread, 1)
   end, opts("Next prompt"))
   vim.keymap.set("n", "gm", function()
-    require("acp.agent.session").get(thread):select_mode()
-  end, opts("Select session mode"))
+    require("acp.agent.session").get(thread):select_config()
+  end, opts("Session config (mode/model)"))
 
   -- "/" on an empty input opens the agent's slash-command picker
   -- (advertised via available_commands_update); otherwise types "/".

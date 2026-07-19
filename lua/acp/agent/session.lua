@@ -112,6 +112,7 @@ function Session:open_session()
       if result and result.modes then
         self:set_modes(result.modes)
       end
+      self:set_config_options(result and result.configOptions)
       require("acp.persist.store").save_debounced()
       self:finish_start(true)
     end)
@@ -132,8 +133,82 @@ function Session:open_session()
     end
     self.thread.session_id = result.sessionId
     self:set_modes(result.modes)
+    self:set_config_options(result.configOptions)
     require("acp.core.registry").emit("state")
     self:finish_start(true)
+  end)
+end
+
+---@param options table[]|nil full config-option state from the agent
+function Session:set_config_options(options)
+  if options ~= nil then
+    self.config_options = options
+    require("acp.ui.workspace").update_winbar(self.thread)
+  end
+end
+
+---@param config_id string
+---@param value string|boolean
+function Session:set_config_option(config_id, value)
+  if not self.rpc or not self.rpc:alive() then
+    return
+  end
+  self.rpc:request(
+    "session/set_config_option",
+    { sessionId = self.thread.session_id, configId = config_id, value = value },
+    function(result, err)
+      if err then
+        chat().append(self.thread, "error", "set config option failed: " .. (err.message or "?"))
+        return
+      end
+      -- Response is the complete updated configuration state.
+      self:set_config_options((result and result.configOptions) or result)
+    end
+  )
+end
+
+---Config-option picker (gm). Falls back to the deprecated modes API for
+---agents that don't expose config options yet.
+function Session:select_config()
+  local options = self.config_options or {}
+  if #options == 0 then
+    self:select_mode()
+    return
+  end
+  local labels = {}
+  for _, opt in ipairs(options) do
+    local current = tostring(opt.currentValue)
+    if opt.type == "select" then
+      for _, o in ipairs(opt.options or {}) do
+        if o.value == opt.currentValue then
+          current = o.name or o.value
+        end
+      end
+    end
+    labels[#labels + 1] = (opt.name or opt.id) .. ": " .. current
+  end
+  vim.ui.select(labels, { prompt = "Session config:" }, function(_, idx)
+    if not idx then
+      return
+    end
+    local opt = options[idx]
+    if opt.type == "boolean" then
+      self:set_config_option(opt.id, not (opt.currentValue == true))
+      return
+    end
+    local values = opt.options or {}
+    local value_labels = {}
+    for _, o in ipairs(values) do
+      local mark = o.value == opt.currentValue and " (current)" or ""
+      value_labels[#value_labels + 1] = (o.name or o.value)
+        .. ((o.description and o.description ~= "") and (" — " .. o.description) or "")
+        .. mark
+    end
+    vim.ui.select(value_labels, { prompt = (opt.name or opt.id) .. ":" }, function(_, vidx)
+      if vidx then
+        self:set_config_option(opt.id, values[vidx].value)
+      end
+    end)
   end)
 end
 
@@ -287,6 +362,7 @@ function Session:ensure_started(cb)
     clientCapabilities = {
       fs = { readTextFile = true, writeTextFile = true },
       terminal = true,
+      session = { configOptions = { boolean = vim.empty_dict() } },
     },
   }, function(result, ierr)
     if ierr or not result then
@@ -575,6 +651,8 @@ function Session:on_notification(method, params)
     end
   elseif kind == "available_commands_update" then
     self.commands = u.availableCommands or {}
+  elseif kind == "config_option_update" then
+    self:set_config_options(u.configOptions)
   elseif kind == "current_mode_update" then
     if self.modes then
       self.modes.currentModeId = u.currentModeId
