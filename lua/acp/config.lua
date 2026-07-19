@@ -42,6 +42,9 @@ M.defaults = {
     -- Rename threads from the agent's session title (session_info_update);
     -- manual renames always win.
     auto_title = true,
+    -- Follow the agent: jump the code window to tool-call locations as it
+    -- works. Toggle per thread with `gf` in the chat.
+    follow = false,
     icons = {
       working = "●",
       attention = "?",

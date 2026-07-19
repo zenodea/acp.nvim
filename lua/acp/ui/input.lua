@@ -67,6 +67,11 @@ function M.ensure_buf(thread)
   vim.keymap.set("n", "gm", function()
     require("acp.agent.session").get(thread):select_config()
   end, opts("Session config (mode/model)"))
+  vim.keymap.set("n", "gf", function()
+    local session = require("acp.agent.session").get(thread)
+    thread.follow = not session:follow_enabled()
+    vim.notify("acp: follow mode " .. (thread.follow and "on" or "off"))
+  end, opts("Toggle follow mode"))
 
   -- "/" on an empty input opens the agent's slash-command picker
   -- (advertised via available_commands_update); otherwise types "/".

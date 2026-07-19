@@ -602,6 +602,29 @@ function Session:on_request(method, params, respond)
   end
 end
 
+---@return boolean
+function Session:follow_enabled()
+  if self.thread.follow ~= nil then
+    return self.thread.follow
+  end
+  return require("acp.config").options.ui.follow
+end
+
+---Jump the code window to where the agent is working (tool-call locations),
+---when follow mode is on and you're looking at this thread's tab.
+---@param locations table[]|nil
+function Session:maybe_follow(locations)
+  if not locations or #locations == 0 or not self:follow_enabled() then
+    return
+  end
+  local thread = self.thread
+  if not thread:tab_valid() or vim.api.nvim_get_current_tabpage() ~= thread.tabpage then
+    return
+  end
+  local loc = locations[1]
+  require("acp.ui.workspace").reveal(thread, loc.path, loc.line)
+end
+
 ---Re-render every tool call embedding a terminal (new output arrived).
 function Session:refresh_terminal_tools()
   for id, call in pairs(self.tool_calls) do
@@ -657,6 +680,7 @@ function Session:on_notification(method, params)
       content = u.content,
     }
     chat().append(self.thread, "tool", events.tool_text(self.tool_calls[id]), id)
+    self:maybe_follow(u.locations)
   elseif kind == "tool_call_update" then
     local id = u.toolCallId
     if id then
@@ -671,6 +695,7 @@ function Session:on_notification(method, params)
       if not chat().update_by_id(self.thread, id, text) then
         chat().append(self.thread, "tool", text, id)
       end
+      self:maybe_follow(u.locations)
     end
   elseif kind == "plan" then
     local text = events.plan_text(u.entries)
