@@ -68,6 +68,33 @@ function M.ensure_buf(thread)
     require("acp.agent.session").get(thread):select_mode()
   end, opts("Select session mode"))
 
+  -- "/" on an empty input opens the agent's slash-command picker
+  -- (advertised via available_commands_update); otherwise types "/".
+  vim.keymap.set("i", "/", function()
+    local commands = thread.session and thread.session.commands or nil
+    local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+    local empty = #lines == 1 and lines[1] == ""
+    if not empty or not commands or #commands == 0 then
+      vim.api.nvim_put({ "/" }, "c", false, true)
+      return
+    end
+    vim.cmd.stopinsert()
+    local labels = {}
+    for _, c in ipairs(commands) do
+      labels[#labels + 1] = "/" .. c.name .. (c.description and c.description ~= "" and (" — " .. c.description) or "")
+    end
+    vim.ui.select(labels, { prompt = "Agent command:" }, function(_, idx)
+      if idx then
+        vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "/" .. commands[idx].name .. " " })
+      end
+      for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+        vim.api.nvim_set_current_win(win)
+        vim.cmd("startinsert!") -- append at end of line
+        break
+      end
+    end)
+  end, opts("Agent command picker"))
+
   -- Pasting lines yanked from a file inserts a context chip like
   -- "(file.txt 1-3)" instead of the raw text (expanded at send time).
   local function paste(after)
