@@ -464,13 +464,20 @@ function Session:on_turn_end(result, err)
 
   local stop = (result and result.stopReason) or "end_turn"
   if cfg.ui.show_result_meta then
-    local label = ({ cancelled = "interrupted", refusal = "refused" })[stop] or "done"
+    local label = ({
+      cancelled = "interrupted",
+      refusal = "refused",
+      max_tokens = "token limit reached",
+      max_turn_requests = "turn limit reached",
+    })[stop] or "done"
     local dur = self.turn_started and (" · " .. (os.time() - self.turn_started) .. "s") or ""
     chat().append(self.thread, "meta", "── " .. label .. dur)
   end
 
   if stop == "refusal" then
     self.thread:set_status("attention", "agent refused")
+  elseif stop == "max_tokens" or stop == "max_turn_requests" then
+    self.thread:set_status("attention", stop == "max_tokens" and "hit token limit" or "hit turn limit")
   elseif stop == "cancelled" then
     self.thread:set_status("idle")
   else
