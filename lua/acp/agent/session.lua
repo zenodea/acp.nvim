@@ -88,11 +88,20 @@ function Session:open_session()
   local params = { cwd = self.thread.cwd, mcpServers = {} }
   if self.thread.session_id and self.caps.loadSession then
     self.loading = true
+    -- The load replay becomes the transcript (it is the agent's source of
+    -- truth and may include turns made outside this plugin). Keep a backup
+    -- in case the load fails.
+    local backup = self.thread.transcript
+    self.thread.transcript = {}
+    require("acp.ui.chat").replay(self.thread)
     local load_params = vim.tbl_extend("force", params, { sessionId = self.thread.session_id })
     self.rpc:request("session/load", load_params, function(result, err)
       self.loading = false
+      chat().close_stream(self.thread)
       if err then
         -- Stale session on the agent side: fall back to a fresh one.
+        self.thread.transcript = backup
+        require("acp.ui.chat").replay(self.thread)
         self.thread.session_id = nil
         self:open_session()
         return
@@ -100,6 +109,7 @@ function Session:open_session()
       if result and result.modes then
         self:set_modes(result.modes)
       end
+      require("acp.persist.store").save_debounced()
       self:finish_start(true)
     end)
     return
@@ -503,14 +513,22 @@ function Session:on_notification(method, params)
   if method ~= "session/update" or type(params) ~= "table" then
     return
   end
-  if params.sessionId ~= self.thread.session_id or self.loading then
+  if params.sessionId ~= self.thread.session_id then
     return
   end
   local u = params.update or {}
   local kind = u.sessionUpdate
   local cfg = require("acp.config").options.ui
 
-  if kind == "agent_message_chunk" then
+  if kind == "user_message_chunk" then
+    -- Only meaningful during session/load replay; live turns echo locally.
+    if self.loading then
+      local text = events.content_text(u.content)
+      if text ~= "" then
+        chat().stream(self.thread, "user", text)
+      end
+    end
+  elseif kind == "agent_message_chunk" then
     local text = events.content_text(u.content)
     if text ~= "" then
       self.last_assistant_text = self.last_assistant_text .. text
@@ -564,7 +582,6 @@ function Session:on_notification(method, params)
     chat().append(self.thread, "meta", "(mode: " .. ((mode and mode.name) or u.currentModeId) .. ")")
     require("acp.ui.workspace").update_winbar(self.thread)
   end
-  -- user_message_chunk (load replay): ignored.
 end
 
 ---@param code integer
