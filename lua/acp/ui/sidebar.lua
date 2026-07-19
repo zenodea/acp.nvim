@@ -6,6 +6,47 @@ local ns = vim.api.nvim_create_namespace("acp-sidebar")
 M.buf = nil
 ---@type table<integer, string> 1-based line -> thread id
 local line_map = {}
+---@type integer[] sorted 1-based lines holding a thread *name* (cursor targets)
+local name_lines = {}
+---@type table<integer, boolean>
+local name_set = {}
+---@type table<integer, integer> win -> last snapped line (for direction)
+local last_pos = {}
+
+---Snap the cursor of the current window to the nearest thread-name line,
+---searching in the direction the cursor was moving.
+function M.snap()
+  local win = vim.api.nvim_get_current_win()
+  if vim.api.nvim_win_get_buf(win) ~= M.buf or #name_lines == 0 then
+    return
+  end
+  local lnum = vim.api.nvim_win_get_cursor(win)[1]
+  if name_set[lnum] then
+    last_pos[win] = lnum
+    return
+  end
+  local prev = last_pos[win]
+  local target
+  if prev and lnum > prev then -- moving down: next name line at/after cursor
+    for _, l in ipairs(name_lines) do
+      if l >= lnum then
+        target = l
+        break
+      end
+    end
+    target = target or name_lines[#name_lines]
+  else -- moving up (or unknown): previous name line at/before cursor
+    for i = #name_lines, 1, -1 do
+      if name_lines[i] <= lnum then
+        target = name_lines[i]
+        break
+      end
+    end
+    target = target or name_lines[1]
+  end
+  pcall(vim.api.nvim_win_set_cursor, win, { target, 0 })
+  last_pos[win] = target
+end
 
 ---@return integer
 function M.ensure_buf()
@@ -55,6 +96,12 @@ function M.ensure_buf()
     end
   end, "Rename thread")
 
+  vim.api.nvim_create_autocmd("CursorMoved", {
+    buffer = buf,
+    desc = "Keep the cursor on thread lines",
+    callback = M.snap,
+  })
+
   M.render()
   return buf
 end
@@ -68,6 +115,8 @@ function M.render()
   local lines = { " ACP", "" }
   local marks = { { 0, "AcpSidebarTitle" } }
   line_map = {}
+  name_lines = {}
+  name_set = {}
 
   if #registry.threads == 0 then
     table.insert(lines, "  no threads yet")
@@ -78,6 +127,8 @@ function M.render()
     local icon = cfg.icons[t.status] or "·"
     table.insert(lines, string.format(" %s %s", icon, t.name))
     line_map[#lines] = t.id
+    table.insert(name_lines, #lines)
+    name_set[#lines] = true
     table.insert(marks, { #lines - 1, hls.status_group(t.status), #icon + 2 })
     if t.worktree then
       table.insert(lines, "     " .. t.worktree.branch)
@@ -106,6 +157,12 @@ function M.render()
     else
       vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { line_hl_group = group })
     end
+  end
+
+  -- Content shifted: re-snap every window currently showing the sidebar.
+  for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+    last_pos[win] = nil
+    vim.api.nvim_win_call(win, M.snap)
   end
 end
 
