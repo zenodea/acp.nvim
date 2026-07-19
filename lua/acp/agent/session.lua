@@ -370,6 +370,19 @@ function Session:ensure_started(cb)
           self.stderr_tail = text
         end
       end,
+      on_request_cancelled = function(method)
+        if live() and method == "session/request_permission" and self.pending_permission then
+          local pending = self.pending_permission
+          self.pending_permission = nil
+          if pending.clear then
+            pcall(pending.clear)
+          end
+          chat().append(self.thread, "meta", "(permission request cancelled by agent)")
+          if self.busy then
+            self.thread:set_status("working")
+          end
+        end
+      end,
       on_exit = function(code)
         if live() then
           self:on_exit(code)
