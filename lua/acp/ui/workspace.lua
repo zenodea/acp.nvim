@@ -109,9 +109,29 @@ function M.update_winbar(thread)
   local agent = thread.agent or require("acp.config").options.default_agent
   local text = " " .. thread.name .. (agent and (" · " .. agent) or "")
   local session = thread.session
-  if session and session.modes and session.modes.currentModeId then
-    local mode = session:find_mode(session.modes.currentModeId)
-    text = text .. " [" .. ((mode and mode.name) or session.modes.currentModeId) .. "]"
+  local badges = {}
+  if session then
+    -- Prefer config options (mode/model categories); fall back to legacy modes.
+    for _, opt in ipairs(session.config_options or {}) do
+      if opt.category == "mode" or opt.category == "model" then
+        local label = tostring(opt.currentValue)
+        if opt.type == "select" then
+          for _, o in ipairs(opt.options or {}) do
+            if o.value == opt.currentValue then
+              label = o.name or o.value
+            end
+          end
+        end
+        table.insert(badges, label)
+      end
+    end
+    if #badges == 0 and session.modes and session.modes.currentModeId then
+      local mode = session:find_mode(session.modes.currentModeId)
+      table.insert(badges, (mode and mode.name) or session.modes.currentModeId)
+    end
+  end
+  if #badges > 0 then
+    text = text .. " [" .. table.concat(badges, " · ") .. "]"
   end
   vim.wo[win].winbar = text
 end
