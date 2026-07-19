@@ -89,10 +89,13 @@ Run `:checkhealth acp` after installing to verify the setup.
 
 ## Commands
 
-- `:Acp` opens the last active thread, or creates one if none exist
-- `:AcpNew [name]` creates a thread, asking for the agent and workspace
-- `:AcpToggleChat` shows or hides the chat column
-- `:AcpInterrupt` interrupts the current thread's turn
+| Command            | Action                                                |
+| ------------------ | ----------------------------------------------------- |
+| `:Acp`             | Open the last active thread, or create one if none exist |
+| `:AcpNew [name]`   | Create a thread, asking for the agent and workspace   |
+| `:AcpToggleChat`   | Show or hide the chat column                          |
+| `:AcpInterrupt`    | Interrupt the current thread's turn                   |
+| `:checkhealth acp` | Verify agents, git, and Neovim setup                  |
 
 ## Keymaps
 
