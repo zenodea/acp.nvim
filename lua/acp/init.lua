@@ -257,7 +257,9 @@ function M.delete(thread)
   if vim.fn.confirm("Delete thread '" .. thread.name .. "'?", "&Yes\n&No", 2) ~= 1 then
     return
   end
-  require("acp.agent.session").stop(thread)
+  if thread.session then
+    thread.session:delete_remote()
+  end
   workspace().close(thread)
 
   if thread.worktree then
@@ -284,6 +286,7 @@ function M.delete(thread)
     end
   end
 
+  require("acp.agent.session").stop(thread)
   registry().remove(thread)
   store().save()
 end
