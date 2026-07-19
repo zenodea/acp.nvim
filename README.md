@@ -1,4 +1,4 @@
-# claude-agents.nvim
+# agent-flow.nvim
 
 Zed-style agent threads for Neovim, powered by the Claude Code CLI.
 
@@ -53,8 +53,8 @@ lazy.nvim:
 
 ```lua
 {
-  "zenodea/claude-agents.nvim",
-  cmd = { "ClaudeAgents", "ClaudeAgentsNew" },
+  "zenodea/agent-flow.nvim",
+  cmd = { "AgentFlow", "AgentFlowNew" },
   opts = {},
 }
 ```
@@ -63,11 +63,11 @@ lazy.nvim:
 
 | Command                   | Action                                          |
 | ------------------------- | ----------------------------------------------- |
-| `:ClaudeAgents`           | Open the last active thread (or create one)     |
-| `:ClaudeAgentsNew [name]` | Create a thread (asks: current checkout / worktree) |
-| `:ClaudeAgentsToggleChat` | Show/hide the chat column in the current thread |
-| `:ClaudeAgentsInterrupt`  | Interrupt the current thread's turn             |
-| `:checkhealth claude-agents` | Verify CLI/git/nvim setup                    |
+| `:AgentFlow`           | Open the last active thread (or create one)     |
+| `:AgentFlowNew [name]` | Create a thread (asks: current checkout / worktree) |
+| `:AgentFlowToggleChat` | Show/hide the chat column in the current thread |
+| `:AgentFlowInterrupt`  | Interrupt the current thread's turn             |
+| `:checkhealth agent-flow` | Verify CLI/git/nvim setup                    |
 
 **Sidebar**: `⏎` open · `n` new · `d` delete (offers worktree cleanup) · `r` rename.
 
@@ -78,14 +78,14 @@ lazy.nvim:
 `<leader>cc` focus the chat of the current/last thread · `<leader>ct` focus the threads sidebar.
 Both rebuild their panel if it was hidden, and open your last thread if you're not in one.
 
-**Statusline**: `require("claude-agents").statusline()` returns e.g. `●2 ?1`.
+**Statusline**: `require("agent-flow").statusline()` returns e.g. `●2 ?1`.
 
 ## Configuration
 
 Defaults:
 
 ```lua
-require("claude-agents").setup({
+require("agent-flow").setup({
   claude = {
     cmd = "claude",
     model = nil,            -- e.g. "claude-sonnet-5"
@@ -127,5 +127,5 @@ panel. If your CLI version doesn't support it, set `permissions` to a
   process per active thread, spawned in the thread's worktree.
 - NDJSON events drive the transcript and a per-thread status state machine;
   the `system:init` event's session id is persisted for `--resume`.
-- State lives in `stdpath("data")/claude-agents/<project-hash>.json`, keyed by
+- State lives in `stdpath("data")/agent-flow/<project-hash>.json`, keyed by
   git root; layouts are captured via `winlayout()` on tab switches and exit.

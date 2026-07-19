@@ -1,5 +1,5 @@
-local process = require("claude-agents.agent.process")
-local events = require("claude-agents.agent.events")
+local process = require("agent-flow.agent.process")
+local events = require("agent-flow.agent.events")
 
 ---@class Session
 ---@field thread Thread
@@ -38,11 +38,11 @@ function M.get(thread)
 end
 
 local function chat()
-  return require("claude-agents.ui.chat")
+  return require("agent-flow.ui.chat")
 end
 
 function Session:build_args()
-  local cfg = require("claude-agents.config").options.claude
+  local cfg = require("agent-flow.config").options.claude
   local args = {
     cfg.cmd,
     "-p",
@@ -169,7 +169,7 @@ end
 
 ---@param block table assistant message content block
 function Session:on_content_block(block)
-  local ui = require("claude-agents.config").options.ui
+  local ui = require("agent-flow.config").options.ui
   if block.type == "text" and block.text and block.text ~= "" then
     self.last_assistant_text = block.text
     chat().append(self.thread, "text", block.text)
@@ -189,7 +189,7 @@ end
 ---@param event table
 function Session:on_result(event)
   self.busy = false
-  local cfg = require("claude-agents.config").options
+  local cfg = require("agent-flow.config").options
 
   if cfg.ui.show_result_meta then
     local parts = {}
@@ -235,13 +235,13 @@ function Session:on_control_request(event)
       tool_name = request.tool_name or "tool",
       input = request.input or vim.empty_dict(),
     }
-    require("claude-agents.ui.permission").show(self.thread, self.pending_permission)
+    require("agent-flow.ui.permission").show(self.thread, self.pending_permission)
     self.thread:set_status("attention", "permission: " .. self.pending_permission.tool_name)
   else
     -- Politely refuse control requests we don't implement (hooks, etc.).
     process.send(self.job, {
       type = "control_response",
-      response = { subtype = "error", request_id = event.request_id, error = "unsupported by claude-agents.nvim" },
+      response = { subtype = "error", request_id = event.request_id, error = "unsupported by agent-flow.nvim" },
     })
   end
 end
@@ -256,7 +256,7 @@ function Session:on_line(line)
   if event.type == "system" and event.subtype == "init" then
     if event.session_id then
       self.thread.session_id = event.session_id
-      require("claude-agents.core.registry").emit("state")
+      require("agent-flow.core.registry").emit("state")
     end
   elseif event.type == "assistant" then
     local message = event.message or {}
@@ -281,7 +281,7 @@ function Session:on_line(line)
             text = table.concat(parts, "\n")
           end
           if type(text) == "string" and text ~= "" then
-            chat().append(self.thread, "error", require("claude-agents.util").shorten(text, 200))
+            chat().append(self.thread, "error", require("agent-flow.util").shorten(text, 200))
           end
         end
       end
@@ -305,7 +305,7 @@ end
 ---Kill the process of an idle thread after the configured timeout; the
 ---conversation is resumable via --resume, so this only frees resources.
 function Session:schedule_reap()
-  local timeout = require("claude-agents.config").options.claude.idle_timeout
+  local timeout = require("agent-flow.config").options.claude.idle_timeout
   if not timeout or timeout <= 0 then
     return
   end

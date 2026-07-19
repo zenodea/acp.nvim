@@ -5,8 +5,8 @@ local M = {}
 ---@param thread Thread
 ---@param pending {request_id: string, tool_name: string, input: table}
 function M.show(thread, pending)
-  local chat = require("claude-agents.ui.chat")
-  local events = require("claude-agents.agent.events")
+  local chat = require("agent-flow.ui.chat")
+  local events = require("agent-flow.agent.events")
 
   local text = "Permission: " .. events.tool_summary(pending.tool_name, pending.input)
   if pending.tool_name == "Bash" and pending.input.command then

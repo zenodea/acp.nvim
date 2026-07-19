@@ -1,6 +1,6 @@
 local M = {}
 
----@class ClaudeAgentsConfig
+---@class AgentFlowConfig
 M.defaults = {
   -- Claude Code CLI
   claude = {

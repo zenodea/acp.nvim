@@ -1,4 +1,4 @@
-local util = require("claude-agents.util")
+local util = require("agent-flow.util")
 
 local M = {}
 
@@ -30,7 +30,7 @@ end
 ---@param slug string
 ---@return {path: string, branch: string}|nil worktree, string|nil err
 function M.create(root, slug)
-  local cfg = require("claude-agents.config").options.worktrees
+  local cfg = require("agent-flow.config").options.worktrees
   local path = root .. "/" .. cfg.dir .. "/" .. slug
   local branch = cfg.branch_prefix .. slug
 

@@ -2,10 +2,10 @@ local M = {}
 
 function M.check()
   local health = vim.health
-  local util = require("claude-agents.util")
-  local cfg = require("claude-agents.config").options
+  local util = require("agent-flow.util")
+  local cfg = require("agent-flow.config").options
 
-  health.start("claude-agents")
+  health.start("agent-flow")
 
   if vim.fn.has("nvim-0.10") == 1 then
     health.ok("Neovim >= 0.10")

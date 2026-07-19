@@ -1,6 +1,6 @@
 local M = {}
 
-local ns = vim.api.nvim_create_namespace("claude-agents-sidebar")
+local ns = vim.api.nvim_create_namespace("agent-flow-sidebar")
 
 ---@type integer|nil shared threads buffer, shown in one window per thread tab
 M.buf = nil
@@ -13,21 +13,21 @@ function M.ensure_buf()
     return M.buf
   end
   local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_buf_set_name(buf, "claude-agents://threads")
+  vim.api.nvim_buf_set_name(buf, "agent-flow://threads")
   vim.bo[buf].buftype = "nofile"
   vim.bo[buf].bufhidden = "hide"
   vim.bo[buf].swapfile = false
-  vim.bo[buf].filetype = "claude-agents-threads"
+  vim.bo[buf].filetype = "agent-flow-threads"
   vim.bo[buf].modifiable = false
   M.buf = buf
 
   local api = function()
-    return require("claude-agents")
+    return require("agent-flow")
   end
   local function thread_at_cursor()
     local lnum = vim.api.nvim_win_get_cursor(0)[1]
     local id = line_map[lnum]
-    return id and require("claude-agents.core.registry").get(id) or nil
+    return id and require("agent-flow.core.registry").get(id) or nil
   end
   local function map(lhs, fn, desc)
     vim.keymap.set("n", lhs, fn, { buffer = buf, desc = desc, nowait = true })
@@ -61,17 +61,17 @@ end
 
 function M.render()
   local buf = M.ensure_buf()
-  local registry = require("claude-agents.core.registry")
-  local cfg = require("claude-agents.config").options.ui
-  local hls = require("claude-agents.ui.highlights")
+  local registry = require("agent-flow.core.registry")
+  local cfg = require("agent-flow.config").options.ui
+  local hls = require("agent-flow.ui.highlights")
 
-  local lines = { " Claude Agents", "" }
-  local marks = { { 0, "ClaudeAgentsSidebarTitle" } }
+  local lines = { " Agent Flow", "" }
+  local marks = { { 0, "AgentFlowSidebarTitle" } }
   line_map = {}
 
   if #registry.threads == 0 then
     table.insert(lines, "  no threads yet")
-    table.insert(marks, { #lines - 1, "ClaudeAgentsSidebarHint" })
+    table.insert(marks, { #lines - 1, "AgentFlowSidebarHint" })
   end
 
   for _, t in ipairs(registry.threads) do
@@ -82,18 +82,18 @@ function M.render()
     if t.worktree then
       table.insert(lines, "     " .. t.worktree.branch)
       line_map[#lines] = t.id
-      table.insert(marks, { #lines - 1, "ClaudeAgentsSidebarBranch" })
+      table.insert(marks, { #lines - 1, "AgentFlowSidebarBranch" })
     end
     if t.status_detail and (t.status == "attention" or t.status == "error") then
       table.insert(lines, "     " .. t.status_detail)
       line_map[#lines] = t.id
-      table.insert(marks, { #lines - 1, "ClaudeAgentsSidebarHint" })
+      table.insert(marks, { #lines - 1, "AgentFlowSidebarHint" })
     end
   end
 
   vim.list_extend(lines, { "", " n new · ⏎ open", " d delete · r rename" })
-  table.insert(marks, { #lines - 2, "ClaudeAgentsSidebarHint" })
-  table.insert(marks, { #lines - 1, "ClaudeAgentsSidebarHint" })
+  table.insert(marks, { #lines - 2, "AgentFlowSidebarHint" })
+  table.insert(marks, { #lines - 1, "AgentFlowSidebarHint" })
 
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
