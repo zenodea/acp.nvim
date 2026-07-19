@@ -83,12 +83,36 @@ function Session:fail_start(err, context)
   self:finish_start(false)
 end
 
----Create (or load) the ACP session after initialize.
+---@return boolean
+function Session:supports_resume()
+  return ((self.caps.sessionCapabilities or {}).resume) ~= nil
+end
+
+---Create, resume, or load the ACP session after initialize.
 function Session:open_session()
   local params = {
     cwd = self.thread.cwd,
     mcpServers = require("acp.config").options.mcp_servers or {},
   }
+  -- Already synced this Neovim session (e.g. process reaped while idle):
+  -- session/resume restarts the conversation without the replay overhead.
+  if self.thread.session_id and self.synced and self:supports_resume() then
+    local resume_params = vim.tbl_extend("force", params, { sessionId = self.thread.session_id })
+    self.rpc:request("session/resume", resume_params, function(result, err)
+      if err then
+        -- Fall back to the load/new paths.
+        self.synced = false
+        self:open_session()
+        return
+      end
+      if result then
+        self:set_modes(result.modes)
+        self:set_config_options(result.configOptions)
+      end
+      self:finish_start(true)
+    end)
+    return
+  end
   if self.thread.session_id and self.caps.loadSession then
     self.loading = true
     -- The load replay becomes the transcript (it is the agent's source of
@@ -113,6 +137,7 @@ function Session:open_session()
         self:set_modes(result.modes)
       end
       self:set_config_options(result and result.configOptions)
+      self.synced = true
       require("acp.persist.store").save_debounced()
       self:finish_start(true)
     end)
@@ -132,6 +157,7 @@ function Session:open_session()
       chat().append(self.thread, "meta", "(agent does not support resume — starting a fresh session)")
     end
     self.thread.session_id = result.sessionId
+    self.synced = true
     self:set_modes(result.modes)
     self:set_config_options(result.configOptions)
     require("acp.core.registry").emit("state")
@@ -370,6 +396,8 @@ function Session:ensure_started(cb)
       return
     end
     self.caps = result.agentCapabilities or {}
+    -- Some agents advertise session capabilities at the top level.
+    self.caps.sessionCapabilities = self.caps.sessionCapabilities or result.sessionCapabilities
     self.auth_methods = result.authMethods or {}
     self.auth_attempted = false
     self:open_session()
@@ -691,7 +719,7 @@ end
 ---agents that can session/load the conversation back.
 function Session:schedule_reap()
   local timeout = require("acp.config").options.idle_timeout
-  if not timeout or timeout <= 0 or not self.caps.loadSession then
+  if not timeout or timeout <= 0 or not (self.caps.loadSession or self:supports_resume()) then
     return
   end
   local marker = os.time()
