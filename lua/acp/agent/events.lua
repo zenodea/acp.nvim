@@ -46,6 +46,8 @@ function M.tool_content_lines(content)
         push("- ", item.oldText)
       end
       push("+ ", item.newText)
+    elseif item.type == "terminal" and item.terminalId then
+      vim.list_extend(lines, require("acp.agent.terminal").render_lines(item.terminalId, cfg.diff_max_lines))
     end
   end
   if #lines > cfg.diff_max_lines then
