@@ -14,6 +14,11 @@ M.defaults = {
   -- Agent used when only one is configured or none is picked.
   default_agent = "claude",
 
+  -- MCP servers forwarded to every agent session (ACP session/new
+  -- mcpServers). Stdio entries: { name = "...", command = "...", args = {},
+  -- env = { { name = "K", value = "V" } } }; http/sse entries per the spec.
+  mcp_servers = {},
+
   -- Kill the process of a thread that has been idle this long (seconds).
   -- Only applies to agents that support session/load (the conversation is
   -- reloaded on next use); others are kept alive.
