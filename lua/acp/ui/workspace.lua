@@ -96,6 +96,33 @@ local function build_tab(thread)
   vim.api.nvim_set_current_win(code_win)
 end
 
+---Show a file (and line) in the thread's code window without stealing focus.
+---@param thread Thread
+---@param path string
+---@param line integer|nil
+function M.reveal(thread, path, line)
+  if not thread:tab_valid() or not path or vim.fn.filereadable(path) ~= 1 then
+    return
+  end
+  local win
+  for _, w in ipairs(vim.api.nvim_tabpage_list_wins(thread.tabpage)) do
+    if not vim.w[w].acp_ui then
+      win = w
+      break
+    end
+  end
+  if not win then
+    return
+  end
+  local buf = vim.fn.bufadd(path)
+  vim.bo[buf].buflisted = true
+  pcall(vim.fn.bufload, buf)
+  pcall(vim.api.nvim_win_set_buf, win, buf)
+  if line then
+    pcall(vim.api.nvim_win_set_cursor, win, { line, 0 })
+  end
+end
+
 ---Refresh the chat winbar: "name · agent [mode]".
 ---@param thread Thread
 function M.update_winbar(thread)

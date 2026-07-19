@@ -186,6 +186,11 @@ function M.ensure_buf(thread)
   map("gm", function()
     require("acp.agent.session").get(thread):select_config()
   end, "Session config (mode/model)")
+  map("gf", function()
+    local session = require("acp.agent.session").get(thread)
+    thread.follow = not session:follow_enabled()
+    vim.notify("acp: follow mode " .. (thread.follow and "on" or "off"))
+  end, "Toggle follow mode")
 
   M.replay(thread)
   return buf
