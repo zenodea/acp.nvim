@@ -3,11 +3,12 @@ local M = {}
 ---@class AcpConfig
 M.defaults = {
   -- ACP agents available for threads. Keys are agent names shown in the
-  -- picker; `cmd` is the full command spawning an ACP server on stdio.
+  -- picker; `cmd` is the full command spawning an ACP server on stdio;
+  -- `icon` is shown next to the thread in the sidebar.
   agents = {
-    claude = { cmd = { "npx", "-y", "@agentclientprotocol/claude-agent-acp" } },
-    -- gemini = { cmd = { "gemini", "--experimental-acp" } },
-    -- codex = { cmd = { "codex-acp" } },
+    claude = { cmd = { "npx", "-y", "@agentclientprotocol/claude-agent-acp" }, icon = "✳" },
+    codex = { cmd = { "npx", "-y", "@agentclientprotocol/codex-acp" }, icon = "⬡" },
+    -- gemini = { cmd = { "gemini", "--experimental-acp" }, icon = "◆" },
     -- Each entry may also set `env = { KEY = "value" }`.
   },
   -- Agent used when only one is configured or none is picked.
@@ -22,8 +23,13 @@ M.defaults = {
     sidebar_width = 30,
     chat_width = 64,
     input_height = 5,
-    -- "input" | "code" | "sidebar": window focused after opening a thread
-    focus_on_open = "input",
+    -- Hide the native tabline (each thread is a tab page; the sidebar
+    -- already shows them). Sets showtabline=0.
+    hide_tabline = true,
+    -- Window focused after opening/switching a thread:
+    -- "keep" stays in the same kind of window you came from (sidebar stays
+    -- sidebar, code stays code); "input" | "code" | "sidebar" force one.
+    focus_on_open = "keep",
     show_thinking = true, -- render agent thought chunks (dimmed)
     show_diffs = true, -- render diffs from tool-call content
     diff_max_lines = 24, -- truncate rendered diffs beyond this

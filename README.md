@@ -11,28 +11,33 @@ several agents in parallel and see at a glance which one is working, which one
 is waiting on you, and which one is done.
 
 ```
-┌──────────┬────────────────────────────┬──────────────────────────┐
-│ Threads  │            Code            │           Chat           │
-│──────────│                            │──────────────────────────│
-│● auth-fix│  (normal editing windows,  │ ❯ You                    │
-│? refactor│   owned by this thread's   │ fix the login bug        │
-│✓ docs    │   tab page)                │                          │
-│          │                            │ Looking at the auth      │
-│          │                            │ module…                  │
-│          │                            │ ⏺ Read src/auth.ts       │
-│          │                            │ ⏺ Edit src/auth.ts …     │
-│          │                            │──────────────────────────│
-│          │                            │ > _                      │
-└──────────┴────────────────────────────┴──────────────────────────┘
+┌────────────┬──────────────────────────┬────────────────────────────┐
+│ Threads    │           Chat           │            Code            │
+│────────────│──────────────────────────│                            │
+│● ✳ auth-fix│ ❯ You                    │  (normal editing windows,  │
+│? ⬡ refactor│ fix the login bug        │   owned by this thread's   │
+│✓ ✳ docs    │                          │   tab page)                │
+│            │ Looking at the auth      │                            │
+│            │ module…                  │                            │
+│            │ ⏺ Read src/auth.ts       │                            │
+│            │ ⏺ Edit src/auth.ts …     │                            │
+│            │──────────────────────────│                            │
+│            │ > _                      │                            │
+└────────────┴──────────────────────────┴────────────────────────────┘
 ```
 
 ## Features
 
-- **Any ACP agent, per thread** — Claude Code by default; add Gemini, Codex,
-  or anything from the [ACP registry](https://agentclientprotocol.com/get-started/registry)
-  and pick an agent per thread.
-- **Threads sidebar** — every thread with status icon, name, and branch.
-  `●` working · `?` needs your attention · `✓` idle · `✗` error.
+- **Any ACP agent, per thread** — Claude Code (`✳`) and Codex (`⬡`) out of the
+  box; add Gemini or anything from the
+  [ACP registry](https://agentclientprotocol.com/get-started/registry).
+  Creating a thread asks which agent it should run, and the sidebar shows the
+  agent's icon next to each thread.
+- **Threads sidebar** — every thread with status icon, agent icon, name, and
+  branch. `●` working · `?` needs your attention · `✓` idle · `✗` error.
+  The cursor snaps to thread lines; the native tabline is hidden (the sidebar
+  *is* the workspace switcher), and switching threads keeps your cursor in the
+  same kind of window — sidebar stays sidebar, code stays code.
 - **Workspace per thread** — one native tab page per thread; buffers, splits,
   and a tab-local `:tcd` are naturally scoped to it.
 - **Worktree isolation (opt-in)** — a new thread can get its own git worktree
@@ -99,9 +104,9 @@ Defaults:
 ```lua
 require("acp").setup({
   agents = {
-    claude = { cmd = { "npx", "-y", "@agentclientprotocol/claude-agent-acp" } },
-    -- gemini = { cmd = { "gemini", "--experimental-acp" } },
-    -- codex  = { cmd = { "codex-acp" } },
+    claude = { cmd = { "npx", "-y", "@agentclientprotocol/claude-agent-acp" }, icon = "✳" },
+    codex  = { cmd = { "npx", "-y", "@agentclientprotocol/codex-acp" }, icon = "⬡" },
+    -- gemini = { cmd = { "gemini", "--experimental-acp" }, icon = "◆" },
     -- Each entry may also set `env = { KEY = "value" }`.
   },
   default_agent = "claude",
@@ -110,7 +115,8 @@ require("acp").setup({
     sidebar_width = 30,
     chat_width = 64,
     input_height = 5,
-    focus_on_open = "input", -- "input" | "code" | "sidebar"
+    hide_tabline = true,     -- threads are tabs; the sidebar replaces the tabline
+    focus_on_open = "keep",  -- "keep" | "input" | "code" | "sidebar"
     show_thinking = true,
     show_diffs = true,
     diff_max_lines = 24,
