@@ -44,6 +44,14 @@ function M.build_chat_column(thread)
   vim.wo[input_win].winfixwidth = true
   vim.wo[input_win].winbar = " ⏎ send · C-j newline · C-c interrupt"
 
+  -- Highlight context chips like "(file.txt 1-3)" in both chat windows.
+  local chip_regex = [[([^) ]\+ \d\+-\d\+)]]
+  for _, win in ipairs({ chat_win, input_win }) do
+    vim.api.nvim_win_call(win, function()
+      vim.fn.matchadd("AcpChip", chip_regex)
+    end)
+  end
+
   -- Keep the transcript pinned to the bottom initially.
   local last = vim.api.nvim_buf_line_count(chat_buf)
   pcall(vim.api.nvim_win_set_cursor, chat_win, { last, 0 })

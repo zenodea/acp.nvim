@@ -51,6 +51,10 @@ is waiting on you, and which one is done.
 - **Editor-aware file access** — the ACP fs capability routes the agent's
   reads/writes through Neovim: it sees your unsaved buffer contents, and its
   edits land in your open buffers.
+- **Context chips** — paste lines yanked from a file into the chat input and
+  they collapse to `(file.txt 1-3)`. On send, the chip expands to the
+  *current* content of those lines (unsaved edits included) as an ACP embedded
+  resource, or a fenced code block for agents without that capability.
 - **Persistence** — threads, transcripts, window layouts, and agent session
   ids survive restarts; conversations resume via ACP `session/load`.
 
@@ -87,6 +91,8 @@ lazy.nvim:
 **Sidebar**: `⏎` open · `n` new · `d` delete (offers worktree cleanup) · `r` rename.
 
 **Chat input**: `⏎` send · `C-j` newline · `C-c` interrupt · `C-p`/`C-n` prompt history.
+Pasting (`p`/`P`/`<C-r>`) lines yanked from a file inserts a `(file.txt 1-3)`
+context chip; anything else pastes literally.
 Permission prompts show their keys inline (typically `y` allow once · `a` always
 allow · `n` reject), answerable from the chat or input window.
 

@@ -80,6 +80,14 @@ local function setup_autocmds()
       require("acp.ui.highlights").setup()
     end,
   })
+
+  vim.api.nvim_create_autocmd("TextYankPost", {
+    group = group,
+    desc = "Track yanks for chat context chips",
+    callback = function()
+      require("acp.context").on_yank()
+    end,
+  })
 end
 
 ---@param opts table|nil

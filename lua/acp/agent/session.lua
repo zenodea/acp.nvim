@@ -223,9 +223,11 @@ function Session:prompt(text)
   self.turn_started = os.time()
   self.last_assistant_text = ""
   self.thread:set_status("working")
+  local prompt_caps = (self.caps and self.caps.promptCapabilities) or {}
+  local blocks = require("acp.context").to_blocks(text, prompt_caps.embeddedContext == true)
   self.rpc:request("session/prompt", {
     sessionId = self.thread.session_id,
-    prompt = { { type = "text", text = text } },
+    prompt = blocks,
   }, function(result, err)
     self:on_turn_end(result, err)
   end)
