@@ -26,12 +26,13 @@ local util = require("acp.util")
 local Thread = {}
 Thread.__index = Thread
 
----@param opts {name: string, cwd: string, worktree: table|nil}
+---@param opts {name: string, cwd: string, worktree: table|nil, agent: string|nil}
 ---@return Thread
 function Thread.new(opts)
   local self = setmetatable({}, Thread)
   self.id = util.uuid()
   self.name = opts.name
+  self.agent = opts.agent
   self.slug = util.slugify(opts.name)
   self.status = "idle"
   self.status_detail = nil
@@ -52,6 +53,7 @@ function Thread.from_state(data)
   local self = setmetatable({}, Thread)
   self.id = data.id
   self.name = data.name
+  self.agent = data.agent
   self.slug = data.slug
   -- A restored thread is never mid-turn; keep attention/error, downgrade working.
   self.status = data.status == "working" and "idle" or (data.status or "idle")
@@ -77,6 +79,7 @@ function Thread:to_state()
   return {
     id = self.id,
     name = self.name,
+    agent = self.agent,
     slug = self.slug,
     status = self.status,
     status_detail = self.status_detail,

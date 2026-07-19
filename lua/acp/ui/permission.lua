@@ -1,18 +1,31 @@
 local M = {}
 
----Render a permission request in the chat panel and arm y/n keymaps on the
----thread's chat + input buffers until it is answered.
+---Preferred keys per ACP permission-option kind.
+local kind_keys = { allow_once = "y", allow_always = "a", reject_once = "n", reject_always = "N" }
+
+---Render an ACP permission request in the chat panel and arm per-option
+---keymaps on the thread's chat + input buffers until it is answered.
 ---@param thread Thread
----@param pending {request_id: string, tool_name: string, input: table}
+---@param pending {respond: fun(...), options: table[], title: string}
 function M.show(thread, pending)
   local chat = require("acp.ui.chat")
-  local events = require("acp.agent.events")
 
-  local text = "Permission: " .. events.tool_summary(pending.tool_name, pending.input)
-  if pending.tool_name == "Bash" and pending.input.command then
-    text = "Permission: Bash\n$ " .. pending.input.command
+  -- Assign a key to every option (kind-based, falling back to digits).
+  local used, keyed = {}, {}
+  for i, option in ipairs(pending.options) do
+    local key = kind_keys[option.kind]
+    if not key or used[key] then
+      key = tostring(i)
+    end
+    used[key] = true
+    table.insert(keyed, { key = key, option = option })
   end
-  chat.append(thread, "permission", text .. "\n[y] allow · [n] deny")
+
+  local hints = {}
+  for _, k in ipairs(keyed) do
+    table.insert(hints, string.format("[%s] %s", k.key, k.option.name or k.option.kind or k.option.optionId))
+  end
+  chat.append(thread, "permission", "Permission: " .. pending.title .. "\n" .. table.concat(hints, " · "))
 
   local bufs = {}
   for _, b in ipairs({ thread.chat_buf, thread.input_buf }) do
@@ -21,26 +34,24 @@ function M.show(thread, pending)
     end
   end
 
-  local function answer(allow)
+  local function clear_maps()
     for _, b in ipairs(bufs) do
-      pcall(vim.keymap.del, "n", "y", { buffer = b })
-      pcall(vim.keymap.del, "n", "n", { buffer = b })
+      for _, k in ipairs(keyed) do
+        pcall(vim.keymap.del, "n", k.key, { buffer = b })
+      end
     end
-    if thread.session and thread.session.pending_permission
-      and thread.session.pending_permission.request_id == pending.request_id then
-      thread.session:answer_permission(allow)
-    end
-    -- Restore the sidebar's `n` = new-thread style default on the input buffer:
-    -- nothing to restore; chat/input have no default y/n maps.
   end
 
-  for _, b in ipairs(bufs) do
-    vim.keymap.set("n", "y", function()
-      answer(true)
-    end, { buffer = b, nowait = true, desc = "Allow tool" })
-    vim.keymap.set("n", "n", function()
-      answer(false)
-    end, { buffer = b, nowait = true, desc = "Deny tool" })
+  for _, k in ipairs(keyed) do
+    for _, b in ipairs(bufs) do
+      vim.keymap.set("n", k.key, function()
+        clear_maps()
+        -- Only answer if this request is still the live one.
+        if thread.session and thread.session.pending_permission == pending then
+          thread.session:answer_permission(k.option.optionId)
+        end
+      end, { buffer = b, nowait = true, desc = "Permission: " .. (k.option.name or k.key) })
+    end
   end
 end
 

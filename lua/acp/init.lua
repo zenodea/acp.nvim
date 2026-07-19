@@ -151,7 +151,8 @@ end
 
 ---@param name string
 ---@param use_worktree boolean
-local function create_thread(name, use_worktree)
+---@param agent string|nil
+local function create_thread(name, use_worktree, agent)
   local Thread = require("acp.core.thread")
   local root = registry().root
   local slug = unique_slug(name)
@@ -166,21 +167,18 @@ local function create_thread(name, use_worktree)
     end
   end
 
-  local thread = Thread.new({ name = name, cwd = wt and wt.path or root, worktree = wt })
+  local thread = Thread.new({ name = name, cwd = wt and wt.path or root, worktree = wt, agent = agent })
   thread.slug = slug
   registry().add(thread)
   workspace().open(thread)
 end
 
----Create a new thread; prompts for name and worktree choice when missing.
+---Create a new thread; prompts for name, agent, and worktree choice.
 ---@param name string|nil
 function M.new(name)
   ensure_setup()
-  local function with_name(n)
-    if not n or vim.trim(n) == "" then
-      return
-    end
-    n = vim.trim(n)
+
+  local function pick_workspace(n, agent)
     if require("acp.util").git_root(registry().root) then
       vim.ui.select(
         { "Current checkout", "New worktree (isolated branch)" },
@@ -189,12 +187,32 @@ function M.new(name)
           if not choice then
             return
           end
-          create_thread(n, idx == 2)
+          create_thread(n, idx == 2, agent)
         end
       )
     else
-      create_thread(n, false)
+      create_thread(n, false, agent)
     end
+  end
+
+  local function pick_agent(n)
+    local names = require("acp.config").agent_names()
+    if #names <= 1 then
+      pick_workspace(n, names[1])
+      return
+    end
+    vim.ui.select(names, { prompt = "Agent for '" .. n .. "':" }, function(choice)
+      if choice then
+        pick_workspace(n, choice)
+      end
+    end)
+  end
+
+  local function with_name(n)
+    if not n or vim.trim(n) == "" then
+      return
+    end
+    pick_agent(vim.trim(n))
   end
 
   if name and vim.trim(name) ~= "" then

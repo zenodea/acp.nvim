@@ -2,20 +2,21 @@ local M = {}
 
 ---@class AcpConfig
 M.defaults = {
-  -- Claude Code CLI
-  claude = {
-    cmd = "claude", -- binary name or absolute path
-    model = nil, -- e.g. "claude-sonnet-5"; nil = CLI default
-    -- Extra args appended to every spawn (e.g. { "--allowedTools", "Read,Grep" })
-    extra_args = {},
-    -- "prompt": route tool permissions through the chat panel (stream-json
-    -- control protocol). Any other value is passed to --permission-mode
-    -- (e.g. "acceptEdits", "bypassPermissions", "plan", "default").
-    permissions = "prompt",
-    -- Kill the process of a thread that has been idle this long (seconds).
-    -- The conversation survives: it is resumed with --resume on next use.
-    idle_timeout = 900,
+  -- ACP agents available for threads. Keys are agent names shown in the
+  -- picker; `cmd` is the full command spawning an ACP server on stdio.
+  agents = {
+    claude = { cmd = { "npx", "-y", "@agentclientprotocol/claude-agent-acp" } },
+    -- gemini = { cmd = { "gemini", "--experimental-acp" } },
+    -- codex = { cmd = { "codex-acp" } },
+    -- Each entry may also set `env = { KEY = "value" }`.
   },
+  -- Agent used when only one is configured or none is picked.
+  default_agent = "claude",
+
+  -- Kill the process of a thread that has been idle this long (seconds).
+  -- Only applies to agents that support session/load (the conversation is
+  -- reloaded on next use); others are kept alive.
+  idle_timeout = 900,
 
   ui = {
     sidebar_width = 30,
@@ -23,10 +24,10 @@ M.defaults = {
     input_height = 5,
     -- "input" | "code" | "sidebar": window focused after opening a thread
     focus_on_open = "input",
-    show_thinking = true, -- render a marker line for thinking blocks
-    show_diffs = true, -- render diffs for Edit/Write tool calls
+    show_thinking = true, -- render agent thought chunks (dimmed)
+    show_diffs = true, -- render diffs from tool-call content
     diff_max_lines = 24, -- truncate rendered diffs beyond this
-    show_result_meta = true, -- "✓ done · $0.01 · 12s" line after each turn
+    show_result_meta = true, -- "── done · 12s" line after each turn
     icons = {
       working = "●",
       attention = "?",
@@ -67,6 +68,14 @@ M.options = vim.deepcopy(M.defaults)
 ---@param opts table|nil
 function M.setup(opts)
   M.options = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), opts or {})
+end
+
+---Sorted list of configured agent names.
+---@return string[]
+function M.agent_names()
+  local names = vim.tbl_keys(M.options.agents)
+  table.sort(names)
+  return names
 end
 
 return M

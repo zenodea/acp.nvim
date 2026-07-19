@@ -26,7 +26,8 @@ function M.build_chat_column(thread)
   vim.wo[chat_win].wrap = true
   vim.wo[chat_win].linebreak = true
   vim.wo[chat_win].winfixwidth = true
-  vim.wo[chat_win].winbar = " " .. thread.name
+  local agent = thread.agent or require("acp.config").options.default_agent
+  vim.wo[chat_win].winbar = " " .. thread.name .. (agent and (" · " .. agent) or "")
 
   vim.cmd("belowright " .. cfg.input_height .. "split")
   local input_win = vim.api.nvim_get_current_win()
