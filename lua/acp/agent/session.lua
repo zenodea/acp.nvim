@@ -462,6 +462,7 @@ function Session:prompt(text)
   chat().append(self.thread, "user", text)
   self.busy = true
   self.turn_started = os.time()
+  self.turn_headered = false
   self.last_assistant_text = ""
   self.thread:set_status("working")
   local prompt_caps = (self.caps and self.caps.promptCapabilities) or {}
@@ -478,6 +479,7 @@ end
 ---@param err table|nil
 function Session:on_turn_end(result, err)
   self.busy = false
+  self.turn_headered = false
   self:cancel_pending_permission()
   chat().close_stream(self.thread)
   local cfg = require("acp.config").options
@@ -635,6 +637,36 @@ function Session:on_request(method, params, respond)
   end
 end
 
+---Label of the currently selected model, if the agent exposes one.
+---@return string|nil
+function Session:model_label()
+  for _, opt in ipairs(self.config_options or {}) do
+    if opt.category == "model" then
+      local label = tostring(opt.currentValue)
+      if opt.type == "select" then
+        for _, o in ipairs(opt.options or {}) do
+          if o.value == opt.currentValue then
+            label = o.name or o.value
+          end
+        end
+      end
+      return label
+    end
+  end
+end
+
+---Append the "❯ provider · model" header once per agent turn, before the
+---first piece of agent output.
+function Session:ensure_turn_header()
+  if self.turn_headered then
+    return
+  end
+  self.turn_headered = true
+  local provider = self.thread.agent or require("acp.config").options.default_agent
+  local model = self:model_label()
+  chat().append(self.thread, "agent", provider .. (model and (" · " .. model) or ""))
+end
+
 ---@return boolean
 function Session:follow_enabled()
   if self.thread.follow ~= nil then
@@ -686,6 +718,7 @@ function Session:on_notification(method, params)
   if kind == "user_message_chunk" then
     -- Only meaningful during session/load replay; live turns echo locally.
     if self.loading then
+      self.turn_headered = false
       local text = events.content_text(u.content)
       if text ~= "" then
         chat().stream(self.thread, "user", text)
@@ -694,6 +727,7 @@ function Session:on_notification(method, params)
   elseif kind == "agent_message_chunk" then
     local text = events.content_text(u.content)
     if text ~= "" then
+      self:ensure_turn_header()
       self.last_assistant_text = self.last_assistant_text .. text
       chat().stream(self.thread, "text", text)
     end
@@ -701,10 +735,12 @@ function Session:on_notification(method, params)
     if cfg.show_thinking then
       local text = events.content_text(u.content)
       if text ~= "" then
+        self:ensure_turn_header()
         chat().stream(self.thread, "thinking", text)
       end
     end
   elseif kind == "tool_call" then
+    self:ensure_turn_header()
     local id = u.toolCallId or tostring(#self.thread.transcript)
     self.tool_calls[id] = {
       title = u.title,

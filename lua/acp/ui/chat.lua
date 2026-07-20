@@ -7,53 +7,64 @@ local ns = vim.api.nvim_create_namespace("acp-chat")
 ---@type table<string, {ranges: {start: integer, count: integer}[], by_id: table<string, integer>, open: boolean}>
 local state = {}
 
+---Kinds that can be collapsed/expanded with <CR>, and which of those start
+---collapsed. The first line stays visible with a "▸ N more" marker.
+local collapsible = { tool = true, thinking = true, permission = true, meta = true, plan = true, error = true }
+local default_collapsed = { tool = true, thinking = true }
+
 ---@param thread Thread
 local function st(thread)
-  state[thread.id] = state[thread.id] or { ranges = {}, by_id = {}, open = false }
+  state[thread.id] = state[thread.id] or { ranges = {}, by_id = {}, open = false, collapsed = {} }
   return state[thread.id]
+end
+
+---@param s table chat state
+---@param kind string
+---@param index integer
+---@return boolean
+local function is_collapsed(s, kind, index)
+  local c = s.collapsed[index]
+  if c == nil then
+    return default_collapsed[kind] == true
+  end
+  return c
 end
 
 ---@param icons table
 ---@param kind string
 ---@param text string
+---@param collapsed boolean|nil
 ---@return string[]
-local function entry_lines(icons, kind, text)
+local function entry_lines(icons, kind, text, collapsed)
   local body = vim.split(text, "\n", { plain = true })
+  -- Every entry starts with one blank line, so completed actions are always
+  -- followed by an empty line once the next entry lands.
   if kind == "user" then
-    local lines = { "", icons.user .. " You" }
+    local lines = { "", icons.user .. " You", "" }
     vim.list_extend(lines, body)
     return lines
-  elseif kind == "text" then
-    local lines = { "" }
-    vim.list_extend(lines, body)
-    return lines
-  elseif kind == "tool" then
-    local lines = {}
-    for i, l in ipairs(body) do
-      lines[i] = (i == 1 and icons.tool .. " " or "  ") .. l
-    end
-    return lines
-  elseif kind == "thinking" then
-    local lines = {}
-    for i, l in ipairs(body) do
-      lines[i] = (i == 1 and icons.thinking .. " " or "  ") .. l
-    end
-    return lines
-  elseif kind == "error" then
-    local lines = {}
-    for i, l in ipairs(body) do
-      lines[i] = (i == 1 and "✗ " or "  ") .. l
-    end
-    return lines
-  elseif kind == "permission" then
-    local lines = { "" }
-    for i, l in ipairs(body) do
-      table.insert(lines, (i == 1 and icons.permission .. " " or "  ") .. l)
-    end
-    return lines
-  else -- meta / plan
-    return body
+  elseif kind == "agent" then
+    -- Turn header: "❯ provider · model" (text carries "provider · model").
+    return { "", icons.user .. " " .. text }
   end
+
+  local prefix = ({ tool = icons.tool, thinking = icons.thinking, error = "✗", permission = icons.permission })[kind]
+  local content
+  if prefix then
+    content = {}
+    for i, l in ipairs(body) do
+      content[i] = (i == 1 and prefix .. " " or "  ") .. l
+    end
+  else -- text / meta / plan
+    content = body
+  end
+
+  if collapsed and collapsible[kind] and #content > 1 then
+    return { "", content[1] .. "  ▸ " .. (#content - 1) .. " more" }
+  end
+  local lines = { "" }
+  vim.list_extend(lines, content)
+  return lines
 end
 
 local kind_hl = {
@@ -69,14 +80,15 @@ local kind_hl = {
 ---@param lines string[]
 ---@param kind string
 local function apply_hl(buf, start, lines, kind)
-  if kind == "user" then
-    vim.api.nvim_buf_set_extmark(buf, ns, start + 1, 0, { line_hl_group = "AcpChatUser", priority = 90 })
+  if kind == "user" or kind == "agent" then
+    local group = kind == "user" and "AcpChatUser" or "AcpChatAgent"
+    vim.api.nvim_buf_set_extmark(buf, ns, start + 1, 0, { line_hl_group = group, priority = 90 })
     return
   end
   local hl = kind_hl[kind]
   for i, l in ipairs(lines) do
     local lnum = start + i - 1
-    if kind == "tool" and i == 1 then
+    if kind == "tool" and i == 2 then
       vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { line_hl_group = "AcpChatTool", priority = 90 })
     elseif l:match("^%s*%+ ") then
       vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { line_hl_group = "AcpDiffAdd", priority = 95 })
@@ -95,7 +107,7 @@ end
 local function push_render(thread, buf, entry)
   local s = st(thread)
   local icons = require("acp.config").options.ui.icons
-  local lines = entry_lines(icons, entry.kind, entry.text)
+  local lines = entry_lines(icons, entry.kind, entry.text, is_collapsed(s, entry.kind, #s.ranges + 1))
   local start
   vim.bo[buf].modifiable = true
   if #s.ranges == 0 then
@@ -129,7 +141,7 @@ local function rerender(thread, index)
     return
   end
   local icons = require("acp.config").options.ui.icons
-  local lines = entry_lines(icons, entry.kind, entry.text)
+  local lines = entry_lines(icons, entry.kind, entry.text, is_collapsed(s, entry.kind, index))
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, range.start, range.start + range.count, false, lines)
   vim.bo[buf].modifiable = false
@@ -191,9 +203,39 @@ function M.ensure_buf(thread)
     thread.follow = not session:follow_enabled()
     vim.notify("acp: follow mode " .. (thread.follow and "on" or "off"))
   end, "Toggle follow mode")
+  map("<CR>", function()
+    M.toggle_at_cursor(thread)
+  end, "Expand/collapse entry")
 
   M.replay(thread)
   return buf
+end
+
+---Toggle collapse of the entry under the cursor (chat window).
+---@param thread Thread
+function M.toggle_at_cursor(thread)
+  local lnum = vim.api.nvim_win_get_cursor(0)[1] - 1
+  local s = st(thread)
+  for index, range in ipairs(s.ranges) do
+    if lnum >= range.start and lnum < range.start + range.count then
+      M.toggle_entry(thread, index)
+      pcall(vim.api.nvim_win_set_cursor, 0, { s.ranges[index].start + 2, 0 })
+      return
+    end
+  end
+end
+
+---Toggle collapse of transcript entry `index`.
+---@param thread Thread
+---@param index integer
+function M.toggle_entry(thread, index)
+  local entry = thread.transcript[index]
+  if not entry or not collapsible[entry.kind] then
+    return
+  end
+  local s = st(thread)
+  s.collapsed[index] = not is_collapsed(s, entry.kind, index)
+  rerender(thread, index)
 end
 
 ---Append a new transcript entry and render it.
@@ -269,6 +311,7 @@ function M.replay(thread)
   s.ranges = {}
   s.by_id = {}
   s.open = false
+  s.collapsed = {}
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, {})
   vim.bo[buf].modifiable = false
