@@ -3,8 +3,10 @@ local util = require("acp.util")
 ---@alias ThreadStatus "idle"|"working"|"attention"|"error"
 
 ---@class TranscriptEntry
----@field kind "user"|"text"|"tool"|"thinking"|"permission"|"meta"|"error"
+---@field kind "user"|"agent"|"text"|"tool"|"thinking"|"permission"|"meta"|"plan"|"error"
 ---@field text string
+---@field id string|nil stable id (e.g. toolCallId)
+---@field tool string|nil ACP tool kind (read/edit/execute/...)
 
 ---@class Thread
 ---@field id string

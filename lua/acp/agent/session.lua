@@ -748,7 +748,7 @@ function Session:on_notification(method, params)
       status = u.status or "pending",
       content = u.content,
     }
-    chat().append(self.thread, "tool", events.tool_text(self.tool_calls[id]), id)
+    chat().append(self.thread, "tool", events.tool_text(self.tool_calls[id]), id, u.kind)
     self:maybe_follow(u.locations)
   elseif kind == "tool_call_update" then
     local id = u.toolCallId
@@ -762,7 +762,7 @@ function Session:on_notification(method, params)
       self.tool_calls[id] = call
       local text = events.tool_text(call)
       if not chat().update_by_id(self.thread, id, text) then
-        chat().append(self.thread, "tool", text, id)
+        chat().append(self.thread, "tool", text, id, call.kind)
       end
       self:maybe_follow(u.locations)
     end
