@@ -128,7 +128,9 @@ function M.render()
     local icon = cfg.icons[t.status] or "·"
     local agent_def = options.agents[t.agent or options.default_agent]
     local agent_icon = agent_def and agent_def.icon
-    local label = agent_icon and (agent_icon .. " " .. t.name) or t.name
+    -- Double space: several agent glyphs render double-width, which visually
+    -- swallows a single space before the name.
+    local label = agent_icon and (agent_icon .. "  " .. t.name) or t.name
     table.insert(lines, string.format(" %s %s", icon, label))
     line_map[#lines] = t.id
     table.insert(name_lines, #lines)
