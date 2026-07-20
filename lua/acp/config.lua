@@ -50,7 +50,13 @@ M.defaults = {
       attention = "?",
       idle = "✓",
       error = "✗",
-      tool = "⏺",
+      tool = "󰖷",
+      -- Per ACP tool kind overrides (read/edit/delete/move/search/execute/
+      -- think/fetch). Trailing spaces are respected: wide nerd-font glyphs
+      -- can bake in the spacing they need.
+      tool_kinds = {
+        read = "  ",
+      },
       thinking = "✱",
       permission = "⚠",
       user = "❯",
