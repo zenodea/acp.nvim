@@ -207,6 +207,27 @@ function M.ensure_buf(thread)
     M.toggle_at_cursor(thread)
   end, "Expand/collapse entry")
 
+  -- The transcript is reached from the chat input (or sidebar), never
+  -- directly from a code window: bounce those entries to the input.
+  vim.api.nvim_create_autocmd("WinEnter", {
+    buffer = buf,
+    callback = function()
+      local prev = vim.fn.win_getid(vim.fn.winnr("#"))
+      if prev == 0 or not vim.api.nvim_win_is_valid(prev) or vim.w[prev].acp_ui ~= nil then
+        return
+      end
+      local tab = vim.api.nvim_get_current_tabpage()
+      local input_win = require("acp.ui.workspace").find_ui_win(tab, "input")
+      if input_win then
+        vim.schedule(function()
+          if vim.api.nvim_win_is_valid(input_win) then
+            vim.api.nvim_set_current_win(input_win)
+          end
+        end)
+      end
+    end,
+  })
+
   M.replay(thread)
   return buf
 end
