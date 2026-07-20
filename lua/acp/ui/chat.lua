@@ -1,6 +1,7 @@
 local M = {}
 
 local ns = vim.api.nvim_create_namespace("acp-chat")
+local ns_pad = vim.api.nvim_create_namespace("acp-chat-pad")
 
 ---Per-thread render state: line range of every transcript entry (so entries
 ---can be re-rendered in place for streaming chunks and tool-call updates).
@@ -14,8 +15,16 @@ local default_collapsed = { tool = true, thinking = true }
 
 ---@param thread Thread
 local function st(thread)
-  state[thread.id] = state[thread.id] or { ranges = {}, by_id = {}, open = false, collapsed = {} }
+  state[thread.id] = state[thread.id] or { ranges = {}, by_id = {}, open = false, collapsed = {}, prev_count = 1 }
   return state[thread.id]
+end
+
+---Icons carry their own trailing spacing when it matters (wide nerd-font
+---glyphs may need two spaces); plain icons get a single space appended.
+---@param icon string
+---@return string
+local function icon_prefix(icon)
+  return icon .. (icon:match("%s$") and "" or " ")
 end
 
 ---@param s table chat state
@@ -31,29 +40,34 @@ local function is_collapsed(s, kind, index)
 end
 
 ---@param icons table
----@param kind string
----@param text string
+---@param entry TranscriptEntry
 ---@param collapsed boolean|nil
 ---@return string[]
-local function entry_lines(icons, kind, text, collapsed)
+local function entry_lines(icons, entry, collapsed)
+  local kind, text = entry.kind, entry.text
   local body = vim.split(text, "\n", { plain = true })
   -- Every entry starts with one blank line, so completed actions are always
   -- followed by an empty line once the next entry lands.
   if kind == "user" then
-    local lines = { "", icons.user .. " You", "" }
+    local lines = { "", icon_prefix(icons.user) .. "You", "" }
     vim.list_extend(lines, body)
     return lines
   elseif kind == "agent" then
     -- Turn header: "❯ provider · model" (text carries "provider · model").
-    return { "", icons.user .. " " .. text }
+    return { "", icon_prefix(icons.user) .. text }
   end
 
-  local prefix = ({ tool = icons.tool, thinking = icons.thinking, error = "✗", permission = icons.permission })[kind]
+  local prefix
+  if kind == "tool" then
+    prefix = (icons.tool_kinds or {})[entry.tool] or icons.tool
+  else
+    prefix = ({ thinking = icons.thinking, error = "✗", permission = icons.permission })[kind]
+  end
   local content
   if prefix then
     content = {}
     for i, l in ipairs(body) do
-      content[i] = (i == 1 and prefix .. " " or "  ") .. l
+      content[i] = (i == 1 and icon_prefix(prefix) or "  ") .. l
     end
   else -- text / meta / plan
     content = body
@@ -65,6 +79,17 @@ local function entry_lines(icons, kind, text, collapsed)
   local lines = { "" }
   vim.list_extend(lines, content)
   return lines
+end
+
+---Keep one phantom blank line below the last entry so the transcript never
+---touches the separator to the input window.
+---@param buf integer
+local function update_pad(buf)
+  local last = vim.api.nvim_buf_line_count(buf)
+  pcall(vim.api.nvim_buf_set_extmark, buf, ns_pad, last - 1, 0, {
+    id = 1,
+    virt_lines = { { { " ", "Normal" } } },
+  })
 end
 
 local kind_hl = {
@@ -107,7 +132,7 @@ end
 local function push_render(thread, buf, entry)
   local s = st(thread)
   local icons = require("acp.config").options.ui.icons
-  local lines = entry_lines(icons, entry.kind, entry.text, is_collapsed(s, entry.kind, #s.ranges + 1))
+  local lines = entry_lines(icons, entry, is_collapsed(s, entry.kind, #s.ranges + 1))
   local start
   vim.bo[buf].modifiable = true
   if #s.ranges == 0 then
@@ -124,6 +149,7 @@ local function push_render(thread, buf, entry)
   if entry.id then
     s.by_id[entry.id] = #s.ranges
   end
+  update_pad(buf)
 end
 
 ---Re-render entry `index` in place (its text changed).
@@ -141,7 +167,7 @@ local function rerender(thread, index)
     return
   end
   local icons = require("acp.config").options.ui.icons
-  local lines = entry_lines(icons, entry.kind, entry.text, is_collapsed(s, entry.kind, index))
+  local lines = entry_lines(icons, entry, is_collapsed(s, entry.kind, index))
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, range.start, range.start + range.count, false, lines)
   vim.bo[buf].modifiable = false
@@ -154,17 +180,25 @@ local function rerender(thread, index)
       s.ranges[i].start = s.ranges[i].start + delta
     end
   end
+  update_pad(buf)
 end
 
+---Stick-to-bottom scrolling: a window follows the stream only while its
+---cursor sits at the (previous) bottom. Scrolling up detaches it; sending a
+---message (force) or pressing G re-attaches it.
+---@param thread Thread
 ---@param buf integer
-local function autoscroll(buf)
+---@param force boolean|nil scroll every window regardless of position
+local function autoscroll(thread, buf, force)
+  local s = st(thread)
   local last = vim.api.nvim_buf_line_count(buf)
-  local current_win = vim.api.nvim_get_current_win()
   for _, win in ipairs(vim.fn.win_findbuf(buf)) do
-    if win ~= current_win then
+    local ok, cursor = pcall(vim.api.nvim_win_get_cursor, win)
+    if ok and (force or cursor[1] >= s.prev_count) then
       pcall(vim.api.nvim_win_set_cursor, win, { last, 0 })
     end
   end
+  s.prev_count = last
 end
 
 ---@param thread Thread
@@ -264,8 +298,9 @@ end
 ---@param kind string
 ---@param text string
 ---@param id string|nil stable id (e.g. toolCallId) for later updates
-function M.append(thread, kind, text, id)
-  local entry = { kind = kind, text = text, id = id }
+---@param tool_kind string|nil ACP tool kind (read/edit/execute/...) for icons
+function M.append(thread, kind, text, id, tool_kind)
+  local entry = { kind = kind, text = text, id = id, tool = tool_kind }
   table.insert(thread.transcript, entry)
   local buf = M.ensure_buf(thread)
   local s = st(thread)
@@ -274,7 +309,8 @@ function M.append(thread, kind, text, id)
     push_render(thread, buf, entry)
   end
   s.open = false
-  autoscroll(buf)
+  -- Sending a message re-attaches every window to the bottom.
+  autoscroll(thread, buf, kind == "user")
   require("acp.persist.store").save_debounced()
 end
 
@@ -294,7 +330,7 @@ function M.stream(thread, kind, chunk)
     M.append(thread, kind, chunk)
   end
   s.open = true
-  autoscroll(buf)
+  autoscroll(thread, buf)
 end
 
 ---Close the current stream: the next stream() starts a fresh entry.
@@ -316,7 +352,7 @@ function M.update_by_id(thread, id, text)
   end
   thread.transcript[index].text = text
   rerender(thread, index)
-  autoscroll(M.ensure_buf(thread))
+  autoscroll(thread, M.ensure_buf(thread))
   require("acp.persist.store").save_debounced()
   return true
 end
@@ -340,7 +376,7 @@ function M.replay(thread)
   for _, entry in ipairs(thread.transcript) do
     push_render(thread, buf, entry)
   end
-  autoscroll(buf)
+  autoscroll(thread, buf, true)
 end
 
 return M
