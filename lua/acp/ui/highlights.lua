@@ -10,6 +10,7 @@ function M.setup()
     AcpStatusIdle = "DiagnosticOk",
     AcpStatusError = "ErrorMsg",
     AcpChatUser = "Title",
+    AcpChatAgent = "Function",
     AcpChatTool = "Function",
     AcpChatThinking = "Comment",
     AcpChatMeta = "Comment",
