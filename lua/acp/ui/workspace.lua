@@ -178,7 +178,7 @@ function M.update_input_winbar(thread)
   end
   local queue = (thread.session and thread.session.queue) or {}
   if #queue > 0 then
-    vim.wo[win].winbar = (" ⏳ %d queued · gq edit · C-c interrupt"):format(#queue)
+    vim.wo[win].winbar = (" ⧗ %d queued · gq edit · C-c interrupt"):format(#queue)
   else
     vim.wo[win].winbar = " ⏎ send · C-j newline · C-c interrupt"
   end
