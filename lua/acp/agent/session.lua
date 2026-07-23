@@ -14,6 +14,8 @@ local events = require("acp.agent.events")
 ---@field tool_calls table<string, table> live tool-call state by toolCallId
 ---@field last_assistant_text string
 ---@field loading boolean session/load replay in flight (updates ignored)
+---@field spinner string|nil current startup spinner frame (winbar)
+---@field spinner_timer uv_timer_t|nil
 local Session = {}
 Session.__index = Session
 
@@ -60,11 +62,51 @@ end
 function Session:finish_start(ok)
   self.starting = false
   self.ready = ok
+  self:stop_spinner()
+  -- Clear the "starting agent" status (fail_start already set error).
+  if ok and not self.busy and self.thread.status == "working" and self.thread.status_detail == "starting agent" then
+    self.thread:set_status("idle")
+  end
   local waiters = self.start_waiters
   self.start_waiters = {}
   for _, cb in ipairs(waiters) do
     pcall(cb, ok)
   end
+  -- An autostarted session with nothing to send still gets reaped when idle.
+  if ok and not self.busy and #self.queue == 0 then
+    self:schedule_reap()
+  end
+end
+
+local spinner_frames = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
+
+---Animate the chat winbar while the agent process starts up.
+function Session:start_spinner()
+  if self.spinner_timer then
+    return
+  end
+  local uv = vim.uv or vim.loop
+  local timer = uv.new_timer()
+  if not timer then
+    return
+  end
+  self.spinner_timer = timer
+  local i = 0
+  timer:start(0, 120, vim.schedule_wrap(function()
+    i = i + 1
+    self.spinner = spinner_frames[(i % #spinner_frames) + 1]
+    require("acp.ui.workspace").update_winbar(self.thread)
+  end))
+end
+
+function Session:stop_spinner()
+  if self.spinner_timer then
+    self.spinner_timer:stop()
+    self.spinner_timer:close()
+    self.spinner_timer = nil
+  end
+  self.spinner = nil
+  require("acp.ui.workspace").update_winbar(self.thread)
 end
 
 ---@param err table|nil
@@ -160,9 +202,46 @@ function Session:open_session()
     self.synced = true
     self:set_modes(result.modes)
     self:set_config_options(result.configOptions)
+    self:apply_favourite_model()
     require("acp.core.registry").emit("state")
     self:finish_start(true)
   end)
+end
+
+---@return string
+function Session:agent_name()
+  return self.thread.agent or require("acp.config").options.default_agent
+end
+
+---Switch a fresh session to this agent's favourite model (the one last
+---picked via the config picker), if it is still offered.
+function Session:apply_favourite_model()
+  local prefs = require("acp.persist.prefs")
+  for _, opt in ipairs(self.config_options or {}) do
+    if opt.category == "model" then
+      local fav = prefs.get_favourite(self:agent_name(), opt.id)
+      if fav ~= nil and fav ~= opt.currentValue then
+        local valid = opt.type ~= "select"
+        for _, o in ipairs(opt.options or {}) do
+          valid = valid or o.value == fav
+        end
+        if valid then
+          self:set_config_option(opt.id, fav)
+        end
+      end
+    end
+  end
+end
+
+---Picking a model makes it the favourite for this agent: new sessions of the
+---same agent start on it.
+---@param config_id string
+function Session:remember_favourite(config_id)
+  for _, opt in ipairs(self.config_options or {}) do
+    if opt.id == config_id and opt.category == "model" then
+      require("acp.persist.prefs").set_favourite(self:agent_name(), opt.id, opt.currentValue)
+    end
+  end
 end
 
 ---@param options table[]|nil full config-option state from the agent
@@ -189,6 +268,7 @@ function Session:set_config_option(config_id, value)
       end
       -- Response is the complete updated configuration state.
       self:set_config_options((result and result.configOptions) or result)
+      self:remember_favourite(config_id)
     end
   )
 end
@@ -354,6 +434,11 @@ function Session:ensure_started(cb)
     return
   end
 
+  -- Loading state while the process boots and the handshake runs: sidebar
+  -- shows the thread as working, the chat winbar gets a spinner.
+  self.thread:set_status("working", "starting agent")
+  self:start_spinner()
+
   -- Guard every handler against events from a stale (killed/replaced)
   -- process: its async on_exit must not clobber a newer spawn's state.
   local rpc
@@ -433,13 +518,15 @@ end
 ---@param text string
 function Session:send(text)
   table.insert(self.queue, text)
+  self:queue_changed()
   if self.busy then
-    chat().append(self.thread, "meta", "(queued — will send when the current turn finishes)")
+    chat().append(self.thread, "meta", ("(queued #%d — gq to edit the queue)"):format(#self.queue))
     return
   end
   self:ensure_started(function(ok)
     if not ok then
       self.queue = {}
+      self:queue_changed()
       return
     end
     self:flush_queue()
@@ -452,9 +539,64 @@ function Session:flush_queue()
     return
   end
   local text = table.remove(self.queue, 1)
+  self:queue_changed()
   if text then
     self:prompt(text)
   end
+end
+
+---Refresh the queue indicator in the input winbar.
+function Session:queue_changed()
+  require("acp.ui.workspace").update_input_winbar(self.thread)
+end
+
+---Inspect and edit the prompts queued behind the current turn (gq).
+function Session:edit_queue()
+  if #self.queue == 0 then
+    vim.notify("acp: no queued prompts", vim.log.levels.INFO)
+    return
+  end
+  local labels = {}
+  for i, text in ipairs(self.queue) do
+    local first = vim.split(text, "\n", { plain = true })[1]
+    labels[i] = i .. ". " .. (#first > 60 and (first:sub(1, 57) .. "…") or first)
+  end
+  vim.ui.select(labels, { prompt = "Queued prompts:" }, function(_, idx)
+    if not idx then
+      return
+    end
+    local chosen = self.queue[idx]
+    vim.ui.select(
+      { "Edit in input", "Remove", "Move to front" },
+      { prompt = labels[idx] },
+      function(_, action)
+        -- The queue may have shifted while the picker was open (a turn
+        -- finished and flushed): re-find the chosen prompt by value.
+        local pos
+        for i, t in ipairs(self.queue) do
+          if t == chosen then
+            pos = i
+            break
+          end
+        end
+        if not action or not pos then
+          return
+        end
+        if action == 1 then
+          local text = table.remove(self.queue, pos)
+          local input = require("acp.ui.input")
+          local buf = input.ensure_buf(self.thread)
+          vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(text, "\n", { plain = true }))
+          input.focus(self.thread)
+        elseif action == 2 then
+          table.remove(self.queue, pos)
+        elseif action == 3 then
+          table.insert(self.queue, 1, table.remove(self.queue, pos))
+        end
+        self:queue_changed()
+      end
+    )
+  end)
 end
 
 ---@param text string
@@ -851,6 +993,7 @@ end
 
 function Session:stop()
   self:cancel_pending_permission()
+  self:stop_spinner()
   if self.rpc and self.rpc:alive() and self.ready and self.thread.session_id then
     self.rpc:request("session/close", { sessionId = self.thread.session_id })
   end
@@ -863,6 +1006,7 @@ function Session:stop()
   self.busy = false
   self.queue = {}
   self.start_waiters = {}
+  self:queue_changed()
 end
 
 ---@param thread Thread

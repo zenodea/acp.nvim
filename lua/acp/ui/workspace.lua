@@ -41,7 +41,7 @@ function M.build_chat_column(thread)
   vim.wo[input_win].wrap = true
   vim.wo[input_win].winfixheight = true
   vim.wo[input_win].winfixwidth = true
-  vim.wo[input_win].winbar = " ⏎ send · C-j newline · C-c interrupt"
+  M.update_input_winbar(thread)
 
   -- Highlight context chips like "(file.txt 1-3)" in both chat windows.
   local chip_regex = [[([^) ]\+ \d\+-\d\+)]]
@@ -160,7 +160,28 @@ function M.update_winbar(thread)
   if #badges > 0 then
     text = text .. " [" .. table.concat(badges, " · ") .. "]"
   end
+  if session and session.starting then
+    text = text .. "  " .. (session.spinner or "…") .. " starting"
+  end
   vim.wo[win].winbar = text
+end
+
+---Refresh the input winbar: send hints, plus the prompt queue when non-empty.
+---@param thread Thread
+function M.update_input_winbar(thread)
+  if not thread:tab_valid() then
+    return
+  end
+  local win = M.find_ui_win(thread.tabpage, "input")
+  if not win then
+    return
+  end
+  local queue = (thread.session and thread.session.queue) or {}
+  if #queue > 0 then
+    vim.wo[win].winbar = (" ⏳ %d queued · gq edit · C-c interrupt"):format(#queue)
+  else
+    vim.wo[win].winbar = " ⏎ send · C-j newline · C-c interrupt"
+  end
 end
 
 ---@param tabpage integer
@@ -200,6 +221,11 @@ function M.open(thread)
   registry.last_active = thread.id
   thread.last_active = os.time()
   registry.emit("state")
+
+  -- Boot the agent session right away so it is ready for the first message.
+  if require("acp.config").options.autostart then
+    require("acp.agent.session").get(thread):ensure_started(function() end)
+  end
 
   local focus = require("acp.config").options.ui.focus_on_open
   if focus == "keep" then

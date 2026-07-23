@@ -19,6 +19,10 @@ M.defaults = {
   -- env = { { name = "K", value = "V" } } }; http/sse entries per the spec.
   mcp_servers = {},
 
+  -- Start the agent session as soon as a thread is opened (instead of on the
+  -- first message), so the agent is ready when you start typing.
+  autostart = true,
+
   -- Kill the process of a thread that has been idle this long (seconds).
   -- Only applies to agents that support session/load (the conversation is
   -- reloaded on next use); others are kept alive.
