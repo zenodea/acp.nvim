@@ -62,7 +62,6 @@ M.defaults = {
       tool_kinds = {
         read = "  ",
         edit = " ",
-        execute = " ",
       },
       thinking = "✱",
       permission = "⚠",
