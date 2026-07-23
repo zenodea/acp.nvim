@@ -63,6 +63,38 @@ local function setup_autocmds()
     end,
   })
 
+  vim.api.nvim_create_autocmd("QuitPre", {
+    group = group,
+    desc = "Quitting the last code window takes the plugin windows with it",
+    callback = function()
+      local cur = vim.api.nvim_get_current_win()
+      if vim.w[cur].acp_ui then
+        return
+      end
+      local tab = vim.api.nvim_get_current_tabpage()
+      local code_wins, ui_wins = 0, {}
+      for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tab)) do
+        if vim.w[win].acp_ui then
+          table.insert(ui_wins, win)
+        elseif vim.api.nvim_win_get_config(win).relative == "" then
+          code_wins = code_wins + 1
+        end
+      end
+      if code_wins > 1 or #ui_wins == 0 then
+        return
+      end
+      -- :q on the last code window would otherwise leave you spamming :q
+      -- through the sidebar/chat/input windows.
+      local thread = registry().find_by_tab(tab)
+      if thread then
+        workspace().capture_layout(thread)
+      end
+      for _, win in ipairs(ui_wins) do
+        pcall(vim.api.nvim_win_close, win, true)
+      end
+    end,
+  })
+
   vim.api.nvim_create_autocmd("VimLeavePre", {
     group = group,
     callback = function()
