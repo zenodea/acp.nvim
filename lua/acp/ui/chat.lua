@@ -196,6 +196,9 @@ local function apply_hl(buf, start, lines, kind)
       vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { line_hl_group = "AcpDiffDelete", priority = 95 })
     elseif l:match("^%s*⋯%s*$") then
       vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { line_hl_group = "AcpDiffSep", priority = 95 })
+    elseif kind == "plan" and l:match("^%s*◐") then
+      -- The in-progress step stands out from the dimmed rest of the plan.
+      vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { line_hl_group = "AcpPlanActive", priority = 95 })
     elseif hl then
       vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { line_hl_group = hl, priority = 90 })
     end
