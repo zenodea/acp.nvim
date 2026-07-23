@@ -100,6 +100,81 @@ local kind_hl = {
   permission = "AcpChatPermission",
 }
 
+---Byte spans of the changed region between two strings after stripping the
+---common prefix/suffix, snapped outward to UTF-8 character boundaries.
+---@param a string
+---@param b string
+---@return integer p common-prefix length
+---@return integer ea end of a's changed span (byte index)
+---@return integer eb end of b's changed span (byte index)
+local function changed_span(a, b)
+  local la, lb = #a, #b
+  local maxp = math.min(la, lb)
+  local p = 0
+  while p < maxp and a:byte(p + 1) == b:byte(p + 1) do
+    p = p + 1
+  end
+  while p > 0 and (a:byte(p + 1) or 0) >= 0x80 and (a:byte(p + 1) or 0) < 0xC0 do
+    p = p - 1
+  end
+  local s = 0
+  while s < maxp - p and a:byte(la - s) == b:byte(lb - s) do
+    s = s + 1
+  end
+  while s > 0 and a:byte(la - s + 1) >= 0x80 and a:byte(la - s + 1) < 0xC0 do
+    s = s - 1
+  end
+  return p, la - s, lb - s
+end
+
+---Accent the changed span of paired -/+ lines: a run of N deletions
+---directly followed by N additions pairs index-wise, and only the part
+---that actually differs gets the *Text highlight on top of the line one.
+---@param buf integer
+---@param start integer 0-based first line of the entry
+---@param lines string[]
+local function apply_intraline_hl(buf, start, lines)
+  local i = 1
+  while i <= #lines do
+    local del_start = i
+    while i <= #lines and lines[i]:match("^%s*%- ") do
+      i = i + 1
+    end
+    local dels = i - del_start
+    local add_start = i
+    while i <= #lines and lines[i]:match("^%s*%+ ") do
+      i = i + 1
+    end
+    if dels > 0 and (i - add_start) == dels then
+      for k = 0, dels - 1 do
+        local dl, al = lines[del_start + k], lines[add_start + k]
+        local d_indent, a_indent = dl:match("^(%s*)"), al:match("^(%s*)")
+        local db, ab = dl:sub(#d_indent + 3), al:sub(#a_indent + 3)
+        local p, ea, eb = changed_span(db, ab)
+        if ea > p then
+          local col = #d_indent + 2 + p
+          vim.api.nvim_buf_set_extmark(buf, ns, start + del_start + k - 1, col, {
+            end_col = #d_indent + 2 + ea,
+            hl_group = "AcpDiffDeleteText",
+            priority = 110,
+          })
+        end
+        if eb > p then
+          local col = #a_indent + 2 + p
+          vim.api.nvim_buf_set_extmark(buf, ns, start + add_start + k - 1, col, {
+            end_col = #a_indent + 2 + eb,
+            hl_group = "AcpDiffAddText",
+            priority = 110,
+          })
+        end
+      end
+    end
+    if i == del_start then
+      i = i + 1 -- neither a - nor a + line: step past it
+    end
+  end
+end
+
 ---@param buf integer
 ---@param start integer 0-based first line of the entry
 ---@param lines string[]
@@ -119,9 +194,14 @@ local function apply_hl(buf, start, lines, kind)
       vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { line_hl_group = "AcpDiffAdd", priority = 95 })
     elseif l:match("^%s*%- ") then
       vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { line_hl_group = "AcpDiffDelete", priority = 95 })
+    elseif l:match("^%s*⋯%s*$") then
+      vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { line_hl_group = "AcpDiffSep", priority = 95 })
     elseif hl then
       vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { line_hl_group = hl, priority = 90 })
     end
+  end
+  if kind == "tool" then
+    apply_intraline_hl(buf, start, lines)
   end
 end
 

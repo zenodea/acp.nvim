@@ -47,14 +47,17 @@ local function diff_lines(old, new, context)
     return {} -- identical text; nothing changed
   end
   local out = {}
-  local last_old = 0 -- last old-line index already emitted (for context runs)
-  for _, hunk in ipairs(indices) do
+  local last_old = 0 -- last old-line index already represented in `out`
+  for h, hunk in ipairs(indices) do
     local oa, oc, na, nc = hunk[1], hunk[2], hunk[3], hunk[4]
-    -- Leading context: unchanged old lines just before this hunk.
-    -- `oa` is the first changed old line (or the line after, when oc == 0).
-    local ctx_start = math.max(last_old + 1, (oc > 0 and oa or oa + 1) - context)
-    local ctx_end = (oc > 0 and oa or oa + 1) - 1
-    for i = ctx_start, ctx_end do
+    -- `oa` is the first changed old line (or the line before an insertion
+    -- when oc == 0).
+    local first_old = oc > 0 and oa or oa + 1
+    local ctx_start = math.max(last_old + 1, first_old - context)
+    if ctx_start > last_old + 1 then
+      table.insert(out, "⋯") -- unchanged lines skipped before this hunk
+    end
+    for i = ctx_start, first_old - 1 do
       table.insert(out, "  " .. old_lines[i])
     end
     for i = oa, oa + oc - 1 do
@@ -63,12 +66,22 @@ local function diff_lines(old, new, context)
     for i = na, na + nc - 1 do
       table.insert(out, "+ " .. new_lines[i])
     end
-    -- Trailing context after the change.
+    -- Trailing context, stopping short of the next hunk's changed lines so
+    -- close hunks never emit a line twice.
     local tail_from = oc > 0 and (oa + oc) or (oa + 1)
-    for i = tail_from, math.min(#old_lines, tail_from + context - 1) do
+    local tail_to = math.min(#old_lines, tail_from + context - 1)
+    local next_hunk = indices[h + 1]
+    if next_hunk then
+      local next_first = next_hunk[2] > 0 and next_hunk[1] or next_hunk[1] + 1
+      tail_to = math.min(tail_to, next_first - 1)
+    end
+    for i = tail_from, tail_to do
       table.insert(out, "  " .. old_lines[i])
     end
-    last_old = math.min(#old_lines, tail_from + context - 1)
+    last_old = math.max(last_old, oc > 0 and (oa + oc - 1) or oa, tail_to)
+  end
+  if last_old < #old_lines then
+    table.insert(out, "⋯") -- unchanged lines skipped after the last hunk
   end
   return out
 end

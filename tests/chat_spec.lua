@@ -52,6 +52,31 @@ function T.edit_tool_entry_uses_pencil_glyph()
   eq({ 0xEF, 0x81, 0x80 }, { line:byte(1, 3) }, "edit icon bytes")
 end
 
+function T.intraline_diff_marks_changed_span_only()
+  n = n + 1
+  local thread = h.thread("chat-test-" .. n)
+  local buf = chat.ensure_buf(thread)
+  chat.append(thread, "tool", "Edit x\n- local foo = 1\n+ local foo = 2", "tc", "edit")
+  chat.toggle_entry(thread, 1) -- tools start collapsed; expand to render body
+  local ns = vim.api.nvim_get_namespaces()["acp-chat"]
+  local found = {}
+  for _, m in ipairs(vim.api.nvim_buf_get_extmarks(buf, ns, 0, -1, { details = true })) do
+    local d = m[4]
+    if d.hl_group == "AcpDiffDeleteText" or d.hl_group == "AcpDiffAddText" then
+      table.insert(found, { d.hl_group, m[2], m[3], d.end_col })
+    end
+  end
+  table.sort(found, function(a, b)
+    return a[2] < b[2]
+  end)
+  -- Lines: 0 "", 1 icon+title, 2 "  - local foo = 1", 3 "  + local foo = 2".
+  -- Only the "1"/"2" (col 16) differ; "local foo = " is common prefix.
+  eq({
+    { "AcpDiffDeleteText", 2, 16, 17 },
+    { "AcpDiffAddText", 3, 16, 17 },
+  }, found)
+end
+
 function T.toggle_expands_collapsed_tool_entry()
   local thread, buf = open_chat()
   local before = vim.api.nvim_buf_line_count(buf)
