@@ -104,6 +104,7 @@ require("acp").setup({
     show_thinking = true,
     show_diffs = true,
     diff_max_lines = 24,
+    diff_context = 3,
     show_result_meta = true,
     auto_title = true,
     follow = false,
