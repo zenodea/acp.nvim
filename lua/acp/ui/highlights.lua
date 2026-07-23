@@ -21,6 +21,7 @@ function M.setup()
     AcpDiffAddText = "DiffText",
     AcpDiffDeleteText = "DiffText",
     AcpDiffSep = "NonText",
+    AcpPlanActive = "Title",
     AcpChip = "Special",
   }
   for group, link in pairs(links) do

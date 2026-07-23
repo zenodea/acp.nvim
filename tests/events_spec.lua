@@ -114,7 +114,7 @@ function T.plan_text_step_glyphs()
     { status = "in_progress", content = "active step" },
     { status = "pending", content = "todo step" },
   })
-  eq("Plan:\n  ● done step\n  ◐ active step\n  ○ todo step", text)
+  eq("Plan:\n  ✓ done step\n  ◐ active step\n  ○ todo step", text)
 end
 
 return T

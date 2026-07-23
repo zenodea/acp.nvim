@@ -135,7 +135,7 @@ end
 ---@param entries table[]
 ---@return string
 function M.plan_text(entries)
-  local icons = { pending = "○", in_progress = "◐", completed = "●" }
+  local icons = { pending = "○", in_progress = "◐", completed = "✓" }
   local lines = { "Plan:" }
   for _, e in ipairs(entries or {}) do
     table.insert(lines, string.format("  %s %s", icons[e.status] or "○", e.content or ""))

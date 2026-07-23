@@ -77,6 +77,22 @@ function T.intraline_diff_marks_changed_span_only()
   }, found)
 end
 
+function T.plan_active_step_is_highlighted()
+  n = n + 1
+  local thread = h.thread("chat-test-" .. n)
+  local buf = chat.ensure_buf(thread)
+  chat.append(thread, "plan", "Plan:\n  ✓ done\n  ◐ active\n  ○ todo", "plan")
+  local ns = vim.api.nvim_get_namespaces()["acp-chat"]
+  local active = {}
+  for _, m in ipairs(vim.api.nvim_buf_get_extmarks(buf, ns, 0, -1, { details = true })) do
+    if m[4].line_hl_group == "AcpPlanActive" then
+      table.insert(active, m[2])
+    end
+  end
+  -- Lines: 0 "", 1 "Plan:", 2 done, 3 active, 4 todo — only line 3 accented.
+  eq({ 3 }, active)
+end
+
 function T.toggle_expands_collapsed_tool_entry()
   local thread, buf = open_chat()
   local before = vim.api.nvim_buf_line_count(buf)
