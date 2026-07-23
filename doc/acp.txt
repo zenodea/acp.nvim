@@ -205,7 +205,6 @@ Defaults: >lua
         tool_kinds = {
           read = "  ",
           edit = " ",
-          execute = " ",
         },
         thinking = "✱",
         permission = "⚠",
