@@ -26,6 +26,53 @@ function M.content_text(content)
   return ""
 end
 
+---Unified-diff lines for a single `diff` content item.
+---Uses `vim.diff` so only changed regions (plus a few context lines) render,
+---rather than the whole old block followed by the whole new block.
+---@param old string
+---@param new string
+---@param context integer unchanged lines kept around each hunk
+---@return string[]
+local function diff_lines(old, new, context)
+  local old_lines = util.lines(old or "")
+  local new_lines = util.lines(new or "")
+  -- A brand-new file (no old text) has nothing to diff against.
+  if old == nil or old == "" then
+    return vim.tbl_map(function(l)
+      return "+ " .. l
+    end, new_lines)
+  end
+  local indices = vim.diff(old, new, { result_type = "indices" })
+  if type(indices) ~= "table" or #indices == 0 then
+    return {} -- identical text; nothing changed
+  end
+  local out = {}
+  local last_old = 0 -- last old-line index already emitted (for context runs)
+  for _, hunk in ipairs(indices) do
+    local oa, oc, na, nc = hunk[1], hunk[2], hunk[3], hunk[4]
+    -- Leading context: unchanged old lines just before this hunk.
+    -- `oa` is the first changed old line (or the line after, when oc == 0).
+    local ctx_start = math.max(last_old + 1, (oc > 0 and oa or oa + 1) - context)
+    local ctx_end = (oc > 0 and oa or oa + 1) - 1
+    for i = ctx_start, ctx_end do
+      table.insert(out, "  " .. old_lines[i])
+    end
+    for i = oa, oa + oc - 1 do
+      table.insert(out, "- " .. old_lines[i])
+    end
+    for i = na, na + nc - 1 do
+      table.insert(out, "+ " .. new_lines[i])
+    end
+    -- Trailing context after the change.
+    local tail_from = oc > 0 and (oa + oc) or (oa + 1)
+    for i = tail_from, math.min(#old_lines, tail_from + context - 1) do
+      table.insert(out, "  " .. old_lines[i])
+    end
+    last_old = math.min(#old_lines, tail_from + context - 1)
+  end
+  return out
+end
+
 ---Lines for a tool call's content items (diffs).
 ---@param content table[]|nil
 ---@return string[]
@@ -42,10 +89,7 @@ function M.tool_content_lines(content)
   end
   for _, item in ipairs(content) do
     if item.type == "diff" then
-      if item.oldText and item.oldText ~= "" then
-        push("- ", item.oldText)
-      end
-      push("+ ", item.newText)
+      vim.list_extend(lines, diff_lines(item.oldText, item.newText, cfg.diff_context or 3))
     elseif item.type == "terminal" and item.terminalId then
       vim.list_extend(lines, require("acp.agent.terminal").render_lines(item.terminalId, cfg.diff_max_lines))
     elseif item.type == "content" then
