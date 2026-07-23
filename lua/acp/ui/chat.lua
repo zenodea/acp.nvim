@@ -183,6 +183,50 @@ local function rerender(thread, index)
   update_pad(buf)
 end
 
+---@type table<integer, integer> win -> last snapped line (for direction)
+local last_pos = {}
+
+---Blank lines are separators, not content: keep the cursor on content lines,
+---snapping in the direction it was moving (same feel as the sidebar).
+local function snap()
+  local win = vim.api.nvim_get_current_win()
+  local buf = vim.api.nvim_win_get_buf(win)
+  local pos = vim.api.nvim_win_get_cursor(win)
+  local lnum = pos[1]
+  local function blank(l)
+    local text = vim.api.nvim_buf_get_lines(buf, l - 1, l, false)[1]
+    return text == nil or text == ""
+  end
+  if not blank(lnum) then
+    last_pos[win] = lnum
+    return
+  end
+  local prev = last_pos[win]
+  local down = prev ~= nil and lnum > prev
+  local total = vim.api.nvim_buf_line_count(buf)
+  local step = down and 1 or -1
+  local target
+  for l = lnum + step, down and total or 1, step do
+    if not blank(l) then
+      target = l
+      break
+    end
+  end
+  if not target then -- nothing further that way: search back the other way
+    for l = lnum - step, down and 1 or total, -step do
+      if not blank(l) then
+        target = l
+        break
+      end
+    end
+  end
+  if target then
+    local text = vim.api.nvim_buf_get_lines(buf, target - 1, target, false)[1] or ""
+    pcall(vim.api.nvim_win_set_cursor, win, { target, math.min(pos[2], math.max(#text - 1, 0)) })
+    last_pos[win] = target
+  end
+end
+
 ---Stick-to-bottom scrolling: a window follows the stream only while its
 ---cursor sits at the (previous) bottom. Scrolling up detaches it; sending a
 ---message (force) or pressing G re-attaches it.
@@ -243,6 +287,12 @@ function M.ensure_buf(thread)
   map("<CR>", function()
     M.toggle_at_cursor(thread)
   end, "Expand/collapse entry")
+
+  vim.api.nvim_create_autocmd("CursorMoved", {
+    buffer = buf,
+    desc = "Keep the cursor on content lines",
+    callback = snap,
+  })
 
   -- The transcript is reached from the chat input (or sidebar), never
   -- directly from a code window: bounce those entries to the input.

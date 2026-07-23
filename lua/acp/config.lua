@@ -61,6 +61,8 @@ M.defaults = {
       -- can bake in the spacing they need.
       tool_kinds = {
         read = "  ",
+        edit = "  ",
+        execute = "  ",
       },
       thinking = "✱",
       permission = "⚠",
