@@ -68,7 +68,9 @@ local function setup_autocmds()
     desc = "Quitting the last code window takes the plugin windows with it",
     callback = function()
       local cur = vim.api.nvim_get_current_win()
-      if vim.w[cur].acp_ui then
+      -- Quitting a plugin window or a float (e.g. the queue editor) only
+      -- closes that window, never the rest of the workspace.
+      if vim.w[cur].acp_ui or vim.api.nvim_win_get_config(cur).relative ~= "" then
         return
       end
       local tab = vim.api.nvim_get_current_tabpage()
