@@ -48,6 +48,30 @@ function M.snap()
   last_pos[win] = target
 end
 
+---Place the cursor of every sidebar window on `thread_id`'s name line.
+---Sidebar windows keep per-tab cursor positions; without this, switching
+---threads lands you on whatever line that tab's sidebar last had.
+---@param thread_id string
+function M.reveal(thread_id)
+  if not M.buf then
+    return
+  end
+  local line
+  for _, l in ipairs(name_lines) do
+    if line_map[l] == thread_id then
+      line = l
+      break
+    end
+  end
+  if not line then
+    return
+  end
+  for _, win in ipairs(vim.fn.win_findbuf(M.buf)) do
+    pcall(vim.api.nvim_win_set_cursor, win, { line, 0 })
+    last_pos[win] = line
+  end
+end
+
 ---@return integer
 function M.ensure_buf()
   if M.buf and vim.api.nvim_buf_is_valid(M.buf) then
