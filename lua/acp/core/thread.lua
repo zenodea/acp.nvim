@@ -104,10 +104,11 @@ function Thread:set_status(status, detail)
     return
   end
   local old = self.status
+  local old_detail = self.status_detail
   self.status = status
   self.status_detail = detail
   self.last_active = os.time()
-  require("acp.core.registry").emit("status", self, old)
+  require("acp.core.registry").emit("status", self, old, old_detail)
 end
 
 ---@return boolean

@@ -30,6 +30,9 @@ summary for your statusline.
 - [x] Editor-provided terminals with live command output
 - [x] Context chips: pasted file yanks become `(file.txt 1-3)`
 - [x] Mode and model picker (`gm`), slash command picker (`/`)
+- [x] Favourite model per agent: the last model you pick becomes the default
+- [x] Sessions autostart when a thread is opened (spinner while booting)
+- [x] Prompt queue shown in the input winbar, editable with `gq`
 - [x] Follow mode: jump to where the agent is working (`gf`)
 - [x] Persistence: threads, layouts, and conversations survive restarts
 - [x] Auto-titled threads, in-editor authentication
@@ -70,7 +73,11 @@ Global: `<leader>cc` focus chat, `<leader>ct` focus sidebar.
 Sidebar: `Enter` open, `n` new, `d` delete, `r` rename.
 
 Chat input: `Enter` send, `Ctrl-j` newline, `Ctrl-c` interrupt, `Ctrl-p`/`Ctrl-n`
-history, `gm` config, `gf` follow, `/` commands, `y`/`a`/`n` permissions.
+history, `gm` config, `gq` edit queued prompts, `gf` follow, `/` commands,
+`y`/`a`/`n` permissions.
+
+Messages sent while the agent is working are queued; the input winbar shows
+the count and `gq` lets you edit, remove, or reorder queued prompts.
 
 ## Configuration
 
@@ -86,6 +93,7 @@ require("acp").setup({
   },
   default_agent = "claude",
   mcp_servers = {},     -- MCP servers forwarded to every agent session
+  autostart = true,     -- boot the agent session when a thread is opened
   idle_timeout = 900,   -- seconds before an idle agent process is stopped
   ui = {
     sidebar_width = 30,
@@ -120,3 +128,6 @@ Notes:
 - Worktrees live in `.worktrees/<thread-name>` on branch `agents/<thread-name>`.
   Deleting a thread offers to remove its worktree.
 - State is stored per project in `stdpath("data")/acp/`, keyed by git root.
+- Picking a model with `gm` makes it the favourite for that agent: new
+  sessions start on it. Favourites are global (all projects), stored in
+  `stdpath("data")/acp/prefs.json`.

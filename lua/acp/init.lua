@@ -16,7 +16,8 @@ end
 
 ---@param thread Thread
 ---@param old ThreadStatus
-local function notify_status(thread, old)
+---@param old_detail string|nil
+local function notify_status(thread, old, old_detail)
   if not require("acp.config").options.notify then
     return
   end
@@ -29,7 +30,8 @@ local function notify_status(thread, old)
     vim.notify(("acp: %s needs attention (%s)"):format(name, thread.status_detail or "waiting"), vim.log.levels.WARN)
   elseif thread.status == "error" then
     vim.notify(("acp: %s failed (%s)"):format(name, thread.status_detail or "error"), vim.log.levels.ERROR)
-  elseif thread.status == "idle" and old == "working" then
+  elseif thread.status == "idle" and old == "working" and old_detail ~= "starting agent" then
+    -- Finishing the session startup is not "done" in any interesting sense.
     vim.notify(("acp: %s is done"):format(name), vim.log.levels.INFO)
   end
 end
@@ -112,10 +114,10 @@ function M.setup(opts)
   setup_autocmds()
 
   local sidebar = require("acp.ui.sidebar")
-  registry().on("status", function(thread, old)
+  registry().on("status", function(thread, old, old_detail)
     sidebar.render()
     store().save_debounced()
-    notify_status(thread, old)
+    notify_status(thread, old, old_detail)
   end)
   registry().on("threads", function()
     sidebar.render()
