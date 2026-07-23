@@ -607,7 +607,7 @@ function Session:edit_queue()
     width = width,
     height = height,
     border = "rounded",
-    title = " queued prompts — close to apply ",
+    title = " queued prompts — :q applies · :w applies and stays ",
     title_pos = "center",
   })
 
