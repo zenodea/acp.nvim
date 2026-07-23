@@ -1,0 +1,280 @@
+*acp.txt*  Parallel AI coding agents over the Agent Client Protocol
+
+Author:  Zeno de Angeli
+License: MIT (see |acp-license|)
+
+==============================================================================
+CONTENTS                                                        *acp-contents*
+
+  1. Introduction ......................... |acp-introduction|
+  2. Requirements ......................... |acp-requirements|
+  3. Setup ................................ |acp-setup|
+  4. Commands ............................. |acp-commands|
+  5. Keymaps .............................. |acp-keymaps|
+  6. The prompt queue ..................... |acp-queue|
+  7. Options .............................. |acp-options|
+  8. Statusline ........................... |acp-statusline|
+  9. Highlights ........................... |acp-highlights|
+ 10. Health ............................... |acp-health|
+
+==============================================================================
+1. INTRODUCTION                                             *acp-introduction*
+
+acp.nvim runs AI coding agents in parallel threads, similar to Zed's agent
+panel. It is built on the Agent Client Protocol (ACP,
+https://agentclientprotocol.com), so it works with any ACP agent. Claude
+Code and Codex are configured out of the box; other agents such as Gemini
+CLI are one config entry away.
+
+Work is organized into threads. A thread is one conversation with one agent
+plus its own workspace: a tab page, a window layout, and optionally a git
+worktree. Several agents can work on the same repository at the same time
+without interfering with each other or with you.
+
+Each thread's tab has three columns: the threads sidebar, the agent chat,
+and your editing windows. The sidebar shows a status per thread: `●`
+working, `?` needs you, `✓` done, `✗` failed. Background threads that need
+attention also fire a notification (see |acp-options|), and
+`require("acp").statusline()` gives you a summary for your statusline.
+
+Threads, layouts, and conversations survive restarts (|acp-options|
+`persist`).
+
+==============================================================================
+2. REQUIREMENTS                                             *acp-requirements*
+
+- Neovim 0.10 or newer
+- Node.js (the bundled Claude Code and Codex adapters run via npx)
+- git, when using worktrees
+- A logged-in Claude Code or Codex CLI
+
+Run |:checkhealth| `acp` after installing.
+
+==============================================================================
+3. SETUP                                                           *acp-setup*
+
+With lazy.nvim: >lua
+
+  {
+    "zenodea/acp.nvim",
+    cmd = { "Acp", "AcpNew" },
+    opts = {},
+  }
+<
+Or directly: >lua
+
+  require("acp").setup({
+    -- your overrides, see |acp-options|
+  })
+<
+==============================================================================
+4. COMMANDS                                                     *acp-commands*
+
+                                                                        *:Acp*
+:Acp            Open the last active thread, or create one if none exist.
+
+                                                                     *:AcpNew*
+:AcpNew [name]  Create a thread. Prompts for the agent and the workspace
+                (current directory or a fresh git worktree). With [name],
+                skips the name prompt.
+
+                                                              *:AcpToggleChat*
+:AcpToggleChat  Show or hide the chat column (chat + input windows) of the
+                current thread tab.
+
+                                                               *:AcpInterrupt*
+:AcpInterrupt   Interrupt the current thread's turn.
+
+==============================================================================
+5. KEYMAPS                                                       *acp-keymaps*
+
+Global (configurable via the `keymaps` option, set to `false` to disable):
+
+  <leader>cc    Focus the chat input of the current (or last) thread
+  <leader>ct    Focus the threads sidebar
+
+Sidebar:
+
+  <CR>          Open the thread under the cursor
+  n             New thread
+  d             Delete the thread under the cursor
+  r             Rename the thread under the cursor
+
+Chat input:
+
+  <CR>          Send the message (insert or normal mode)
+  <C-j>         Insert a newline
+  <C-c>         Interrupt the agent
+  <C-p> <C-n>   Prompt history
+  gm            Session config picker (mode / model)
+  gq            Edit the queued prompts, see |acp-queue|
+  gf            Toggle follow mode (jump to where the agent works)
+  /             Agent slash commands (at the start of the input)
+  y a n         Answer a pending permission prompt (allow / always / deny)
+
+Chat transcript:
+
+  <CR>          Expand or collapse the entry under the cursor
+  i             Focus the message input
+  <C-c>         Interrupt the agent
+  gm gq gf      As in the input window
+
+The transcript cursor only rests on content lines; blank separator lines
+are skipped in the direction of movement.
+
+==============================================================================
+6. THE PROMPT QUEUE                                                *acp-queue*
+
+Messages sent while the agent is working are queued and sent one per turn.
+The input winbar shows the pending count.
+
+`gq` opens the queue as plain text in a floating buffer: every prompt is a
+block of text, blocks are separated by `─` lines. Edit, reorder, or delete
+blocks like any text, then close the window to apply the result to the
+queue. `:w` applies without closing. Prompts that the agent picks up while
+the editor is open are not re-queued when it closes (unless you edited
+them, in which case your edited version stays queued).
+
+==============================================================================
+7. OPTIONS                                                       *acp-options*
+
+Defaults: >lua
+
+  require("acp").setup({
+    -- ACP agents available for threads. Keys are agent names shown in the
+    -- picker; `cmd` spawns an ACP server on stdio; `icon` is shown in the
+    -- sidebar. Entries may also set env = { KEY = "value" }.
+    agents = {
+      claude = {
+        cmd = { "npx", "-y", "@agentclientprotocol/claude-agent-acp" },
+        icon = "✳",
+      },
+      codex = {
+        cmd = { "npx", "-y", "@agentclientprotocol/codex-acp" },
+        icon = "⬡",
+      },
+      -- gemini = { cmd = { "gemini", "--experimental-acp" }, icon = "◆" },
+    },
+    -- Agent used when only one is configured or none is picked.
+    default_agent = "claude",
+
+    -- MCP servers forwarded to every agent session (ACP session/new
+    -- mcpServers). Stdio entries:
+    -- { name = "...", command = "...", args = {},
+    --   env = { { name = "K", value = "V" } } }
+    mcp_servers = {},
+
+    -- Start the agent session as soon as a thread is opened (instead of
+    -- on the first message).
+    autostart = true,
+
+    -- Kill the process of a thread idle this long (seconds). Only applies
+    -- to agents that support session/load; others are kept alive.
+    idle_timeout = 900,
+
+    ui = {
+      sidebar_width = 30,
+      chat_width = 64,
+      input_height = 5,
+      -- Hide the native tabline (sets 'showtabline' to 0).
+      hide_tabline = true,
+      -- Window focused after opening/switching a thread: "keep" stays in
+      -- the same kind of window you came from; "input" | "code" |
+      -- "sidebar" force one.
+      focus_on_open = "keep",
+      show_thinking = true,      -- render agent thought chunks (dimmed)
+      show_diffs = true,         -- render diffs from tool-call content
+      diff_max_lines = 24,       -- truncate rendered diffs beyond this
+      diff_context = 3,          -- context lines around each diff hunk
+      show_result_meta = true,   -- "── done · 12s" line after each turn
+      -- Rename threads from the agent's session title; manual renames
+      -- always win.
+      auto_title = true,
+      -- Follow the agent: jump the code window to tool-call locations as
+      -- it works. Toggle per thread with `gf`.
+      follow = false,
+      icons = {
+        working = "●",
+        attention = "?",
+        idle = "✓",
+        error = "✗",
+        tool = "󰖷",
+        -- Per ACP tool kind overrides (read/edit/delete/move/search/
+        -- execute/think/fetch). Trailing spaces are respected so wide
+        -- nerd-font glyphs can bake in the spacing they need.
+        tool_kinds = {
+          read = "  ",
+          edit = " ",
+          execute = " ",
+        },
+        thinking = "✱",
+        permission = "⚠",
+        user = "❯",
+      },
+    },
+
+    worktrees = {
+      -- Directory (relative to the repo root) where thread worktrees live.
+      dir = ".worktrees",
+      -- Prefix for branches created for thread worktrees.
+      branch_prefix = "agents/",
+    },
+
+    persist = {
+      enabled = true,
+      -- Max transcript entries kept per thread in the state file.
+      max_transcript = 2000,
+    },
+
+    -- Global keymaps (set a value to false to disable it).
+    keymaps = {
+      chat = "<leader>cc",
+      threads = "<leader>ct",
+    },
+
+    -- vim.notify when a background thread needs attention / finishes.
+    notify = true,
+  })
+<
+==============================================================================
+8. STATUSLINE                                                 *acp-statusline*
+
+`require("acp").statusline()` returns a compact summary such as `●2 ?1`
+(two threads working, one needing attention), or an empty string when there
+are no threads. Example for a custom statusline: >lua
+
+  vim.o.statusline = "%f %= %{v:lua.require'acp'.statusline()} "
+<
+==============================================================================
+9. HIGHLIGHTS                                                 *acp-highlights*
+
+All groups are defined with `default = true` links and can be overridden:
+
+  AcpSidebarTitle     sidebar title            -> Title
+  AcpSidebarHint      sidebar hints            -> Comment
+  AcpSidebarBranch    worktree branch lines    -> Comment
+  AcpStatusWorking    working status           -> DiagnosticWarn
+  AcpStatusAttention  needs-you status         -> DiagnosticError
+  AcpStatusIdle       done status              -> DiagnosticOk
+  AcpStatusError      failed status            -> ErrorMsg
+  AcpChatUser         user turn header         -> Title
+  AcpChatAgent        agent turn header        -> Function
+  AcpChatTool         tool call title          -> Function
+  AcpChatThinking     thought chunks           -> Comment
+  AcpChatMeta         meta / plan lines        -> Comment
+  AcpChatError        error entries            -> DiagnosticError
+  AcpChatPermission   permission prompts       -> DiagnosticWarn
+  AcpDiffAdd          added diff lines         -> DiffAdd
+  AcpDiffDelete       removed diff lines       -> DiffDelete
+  AcpChip             context chips            -> Special
+
+==============================================================================
+10. HEALTH                                                        *acp-health*
+
+`:checkhealth acp` verifies the Neovim version, the configured agent
+commands, git (for worktrees), and Node.js availability.
+
+                                                                 *acp-license*
+MIT.
+
+vim:tw=78:ts=8:noet:ft=help:norl:
