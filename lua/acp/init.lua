@@ -187,8 +187,10 @@ local function unique_slug(name)
   local base = util.slugify(name)
   local slug = base
   local n = 1
-  while registry().find_by_slug(slug) ~= nil
-    or vim.fn.isdirectory(registry().root .. "/" .. cfg.dir .. "/" .. slug) == 1 do
+  while
+    registry().find_by_slug(slug) ~= nil
+    or vim.fn.isdirectory(registry().root .. "/" .. cfg.dir .. "/" .. slug) == 1
+  do
     n = n + 1
     slug = base .. "-" .. n
   end

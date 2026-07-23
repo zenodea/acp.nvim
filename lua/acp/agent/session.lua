@@ -92,11 +92,15 @@ function Session:start_spinner()
   end
   self.spinner_timer = timer
   local i = 0
-  timer:start(0, 120, vim.schedule_wrap(function()
-    i = i + 1
-    self.spinner = spinner_frames[(i % #spinner_frames) + 1]
-    require("acp.ui.workspace").update_winbar(self.thread)
-  end))
+  timer:start(
+    0,
+    120,
+    vim.schedule_wrap(function()
+      i = i + 1
+      self.spinner = spinner_frames[(i % #spinner_frames) + 1]
+      require("acp.ui.workspace").update_winbar(self.thread)
+    end)
+  )
 end
 
 function Session:stop_spinner()
@@ -127,7 +131,7 @@ end
 
 ---@return boolean
 function Session:supports_resume()
-  return ((self.caps.sessionCapabilities or {}).resume) ~= nil
+  return (self.caps.sessionCapabilities or {}).resume ~= nil
 end
 
 ---Create, resume, or load the ACP session after initialize.
@@ -1007,7 +1011,13 @@ function Session:on_notification(method, params)
     self:set_config_options(u.configOptions)
   elseif kind == "session_info_update" then
     local title = u.title
-    if cfg.auto_title and not self.thread.manual_name and type(title) == "string" and title ~= "" and title ~= self.thread.name then
+    if
+      cfg.auto_title
+      and not self.thread.manual_name
+      and type(title) == "string"
+      and title ~= ""
+      and title ~= self.thread.name
+    then
       self.thread.name = title
       require("acp.core.registry").emit("threads")
       require("acp.ui.workspace").update_winbar(self.thread)
