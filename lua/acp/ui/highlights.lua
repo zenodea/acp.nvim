@@ -18,6 +18,9 @@ function M.setup()
     AcpChatPermission = "DiagnosticWarn",
     AcpDiffAdd = "DiffAdd",
     AcpDiffDelete = "DiffDelete",
+    AcpDiffAddText = "DiffText",
+    AcpDiffDeleteText = "DiffText",
+    AcpDiffSep = "NonText",
     AcpChip = "Special",
   }
   for group, link in pairs(links) do

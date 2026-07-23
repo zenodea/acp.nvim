@@ -19,7 +19,7 @@ function T.diff_single_line_change_renders_one_hunk()
   ui({ diff_context = 2, diff_max_lines = 24 })
   local old = table.concat({ "a", "b", "c", "d", "e", "f", "g", "h" }, "\n")
   local new = table.concat({ "a", "b", "c", "X", "e", "f", "g", "h" }, "\n")
-  eq({ "  b", "  c", "- d", "+ X", "  e", "  f" }, diff(old, new))
+  eq({ "⋯", "  b", "  c", "- d", "+ X", "  e", "  f", "⋯" }, diff(old, new))
 end
 
 function T.diff_insertion()
@@ -48,6 +48,45 @@ function T.diff_truncates_beyond_max_lines()
   local lines = diff("", new)
   eq(5, #lines)
   eq("… (4 more lines)", lines[5])
+end
+
+function T.diff_gap_between_hunks_marked()
+  ui({ diff_context = 2, diff_max_lines = 50 })
+  local old_t = {}
+  for i = 1, 12 do
+    old_t[i] = "L" .. i
+  end
+  local new_t = vim.deepcopy(old_t)
+  new_t[2] = "X"
+  new_t[11] = "Y"
+  eq({
+    "  L1",
+    "- L2",
+    "+ X",
+    "  L3",
+    "  L4",
+    "⋯",
+    "  L9",
+    "  L10",
+    "- L11",
+    "+ Y",
+    "  L12",
+  }, diff(table.concat(old_t, "\n"), table.concat(new_t, "\n")))
+end
+
+function T.diff_close_hunks_do_not_duplicate_context()
+  ui({ diff_context = 3, diff_max_lines = 50 })
+  eq(
+    { "  a", "- b", "+ B", "  c", "- d", "+ D", "  e" },
+    diff(table.concat({ "a", "b", "c", "d", "e" }, "\n"), table.concat({ "a", "B", "c", "D", "e" }, "\n"))
+  )
+end
+
+function T.diff_trailing_gap_marked()
+  ui({ diff_context = 1, diff_max_lines = 50 })
+  local lines =
+    diff(table.concat({ "a", "b", "c", "d", "e", "f" }, "\n"), table.concat({ "a", "X", "c", "d", "e", "f" }, "\n"))
+  eq({ "  a", "- b", "+ X", "  c", "⋯" }, lines)
 end
 
 function T.diff_disabled_renders_nothing()
