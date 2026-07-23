@@ -221,6 +221,8 @@ function M.open(thread)
   registry.last_active = thread.id
   thread.last_active = os.time()
   registry.emit("state")
+  -- Keep every sidebar window's cursor on the thread being opened.
+  require("acp.ui.sidebar").reveal(thread.id)
 
   -- Boot the agent session right away so it is ready for the first message.
   if require("acp.config").options.autostart then
