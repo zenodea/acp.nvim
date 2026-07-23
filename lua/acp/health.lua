@@ -32,7 +32,9 @@ function M.check()
     end
   end
   if cfg.agents.claude then
-    health.info("the claude adapter uses your Claude Code login (run `claude` once to authenticate) or ANTHROPIC_API_KEY")
+    health.info(
+      "the claude adapter uses your Claude Code login (run `claude` once to authenticate) or ANTHROPIC_API_KEY"
+    )
   end
 
   if vim.fn.executable("git") == 1 then

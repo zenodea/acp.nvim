@@ -89,7 +89,9 @@ function M.ensure_buf(thread)
     vim.cmd.stopinsert()
     local labels = {}
     for _, c in ipairs(commands) do
-      labels[#labels + 1] = "/" .. c.name .. (c.description and c.description ~= "" and (" — " .. c.description) or "")
+      labels[#labels + 1] = "/"
+        .. c.name
+        .. (c.description and c.description ~= "" and (" — " .. c.description) or "")
     end
     vim.ui.select(labels, { prompt = "Agent command:" }, function(_, idx)
       if idx then
