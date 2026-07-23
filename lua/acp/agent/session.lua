@@ -539,6 +539,11 @@ function Session:flush_queue()
     return
   end
   local text = table.remove(self.queue, 1)
+  -- A queue editor may be open: remember what was sent so applying the
+  -- buffer afterwards doesn't resurrect (and resend) this prompt.
+  if self._queue_flushed and text then
+    table.insert(self._queue_flushed, text)
+  end
   self:queue_changed()
   if text then
     self:prompt(text)
@@ -550,53 +555,136 @@ function Session:queue_changed()
   require("acp.ui.workspace").update_input_winbar(self.thread)
 end
 
----Inspect and edit the prompts queued behind the current turn (gq).
+---Separator line between prompts in the queue editor buffer.
+local QUEUE_SEP = string.rep("─", 40)
+
+---Inspect and edit the queued prompts (gq): a scratch float holding the
+---plain text of every prompt, separated by ─ lines. Edit, reorder, or
+---delete blocks like any buffer; closing it (or :w) applies the queue.
 function Session:edit_queue()
   if #self.queue == 0 then
     vim.notify("acp: no queued prompts", vim.log.levels.INFO)
     return
   end
-  local labels = {}
+
+  local lines = {}
   for i, text in ipairs(self.queue) do
-    local first = vim.split(text, "\n", { plain = true })[1]
-    labels[i] = i .. ". " .. (#first > 60 and (first:sub(1, 57) .. "…") or first)
+    if i > 1 then
+      table.insert(lines, QUEUE_SEP)
+    end
+    vim.list_extend(lines, vim.split(text, "\n", { plain = true }))
   end
-  vim.ui.select(labels, { prompt = "Queued prompts:" }, function(_, idx)
-    if not idx then
+
+  local name = "acp://queue/" .. self.thread.id
+  require("acp.util").wipe_named_buf(name)
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_name(buf, name)
+  vim.bo[buf].buftype = "acwrite" -- lets :w apply without closing
+  vim.bo[buf].bufhidden = "wipe"
+  vim.bo[buf].swapfile = false
+  vim.bo[buf].filetype = "markdown"
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  vim.bo[buf].modified = false
+  -- The queue is applied when the window closes, so the buffer is never
+  -- "unsaved": keep 'modified' off so a plain :q never trips E37.
+  vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+    buffer = buf,
+    callback = function()
+      vim.bo[buf].modified = false
+    end,
+  })
+
+  local width = math.min(80, math.max(vim.o.columns - 8, 20))
+  local height = math.min(math.max(#lines, 3) + 1, math.max(vim.o.lines - 6, 3))
+  vim.api.nvim_open_win(buf, true, {
+    relative = "editor",
+    row = math.floor((vim.o.lines - height) / 2),
+    col = math.floor((vim.o.columns - width) / 2),
+    width = width,
+    height = height,
+    border = "rounded",
+    title = " queued prompts — close to apply ",
+    title_pos = "center",
+  })
+
+  -- Prompts sent while the editor is open (recorded by flush_queue) must
+  -- not be re-queued when the buffer is applied.
+  local flushed = {}
+  self._queue_flushed = flushed
+
+  local function parse()
+    local prompts, block = {}, {}
+    local function push()
+      local s, e = 1, #block
+      while s <= e and block[s]:match("^%s*$") do
+        s = s + 1
+      end
+      while e >= s and block[e]:match("^%s*$") do
+        e = e - 1
+      end
+      if s <= e then
+        table.insert(prompts, table.concat(vim.list_slice(block, s, e), "\n"))
+      end
+      block = {}
+    end
+    -- "─" is multibyte, so quantifiers can't apply to the whole char: match
+    -- three literal ─ then allow only ─ bytes/whitespace to the end.
+    local sep_pat = "^%s*───[─%s]*$"
+    for _, l in ipairs(vim.api.nvim_buf_get_lines(buf, 0, -1, false)) do
+      if l:match(sep_pat) then
+        push()
+      else
+        table.insert(block, l)
+      end
+    end
+    push()
+    local out = {}
+    for _, p in ipairs(prompts) do
+      local sent
+      for j, f in ipairs(flushed) do
+        if f == p then
+          sent = j
+          break
+        end
+      end
+      if sent then
+        table.remove(flushed, sent)
+      else
+        table.insert(out, p)
+      end
+    end
+    return out
+  end
+
+  local applied = false
+  local function apply()
+    if applied or not vim.api.nvim_buf_is_valid(buf) then
       return
     end
-    local chosen = self.queue[idx]
-    vim.ui.select(
-      { "Edit in input", "Remove", "Move to front" },
-      { prompt = labels[idx] },
-      function(_, action)
-        -- The queue may have shifted while the picker was open (a turn
-        -- finished and flushed): re-find the chosen prompt by value.
-        local pos
-        for i, t in ipairs(self.queue) do
-          if t == chosen then
-            pos = i
-            break
-          end
-        end
-        if not action or not pos then
-          return
-        end
-        if action == 1 then
-          local text = table.remove(self.queue, pos)
-          local input = require("acp.ui.input")
-          local buf = input.ensure_buf(self.thread)
-          vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(text, "\n", { plain = true }))
-          input.focus(self.thread)
-        elseif action == 2 then
-          table.remove(self.queue, pos)
-        elseif action == 3 then
-          table.insert(self.queue, 1, table.remove(self.queue, pos))
-        end
-        self:queue_changed()
+    self.queue = parse()
+    self:queue_changed()
+  end
+
+  vim.api.nvim_create_autocmd("BufWriteCmd", {
+    buffer = buf,
+    desc = "Apply the edited prompt queue",
+    callback = function()
+      self.queue = parse()
+      self:queue_changed()
+      vim.bo[buf].modified = false
+    end,
+  })
+  vim.api.nvim_create_autocmd("BufWipeout", {
+    buffer = buf,
+    desc = "Apply the edited prompt queue",
+    callback = function()
+      apply()
+      applied = true
+      if self._queue_flushed == flushed then
+        self._queue_flushed = nil
       end
-    )
-  end)
+    end,
+  })
 end
 
 ---@param text string

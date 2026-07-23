@@ -77,7 +77,9 @@ history, `gm` config, `gq` edit queued prompts, `gf` follow, `/` commands,
 `y`/`a`/`n` permissions.
 
 Messages sent while the agent is working are queued; the input winbar shows
-the count and `gq` lets you edit, remove, or reorder queued prompts.
+the count. `gq` opens the queue as plain text in a floating buffer — edit,
+reorder, or delete the `─`-separated blocks like any text and close the
+window (or `:w`) to apply.
 
 ## Configuration
 
