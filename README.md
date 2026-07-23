@@ -131,3 +131,5 @@ Notes:
 - Picking a model with `gm` makes it the favourite for that agent: new
   sessions start on it. Favourites are global (all projects), stored in
   `stdpath("data")/acp/prefs.json`.
+- `:q` in the last code window of a thread tab closes the sidebar/chat
+  windows with it, so quitting doesn't require closing each plugin window.
