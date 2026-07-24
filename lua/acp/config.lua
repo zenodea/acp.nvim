@@ -8,7 +8,7 @@ M.defaults = {
   agents = {
     claude = { cmd = { "npx", "-y", "@agentclientprotocol/claude-agent-acp" }, icon = "✳" },
     codex = { cmd = { "npx", "-y", "@agentclientprotocol/codex-acp" }, icon = "⬡" },
-    -- gemini = { cmd = { "gemini", "--experimental-acp" }, icon = "◆" },
+    gemini = { cmd = { "npx", "-y", "@google/gemini-cli", "--experimental-acp" }, icon = "◆" },
     -- Each entry may also set `env = { KEY = "value" }`.
   },
   -- Agent used when only one is configured or none is picked.

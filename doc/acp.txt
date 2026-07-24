@@ -23,8 +23,8 @@ CONTENTS                                                        *acp-contents*
 acp.nvim runs AI coding agents in parallel threads, similar to Zed's agent
 panel. It is built on the Agent Client Protocol (ACP,
 https://agentclientprotocol.com), so it works with any ACP agent. Claude
-Code and Codex are configured out of the box; other agents such as Gemini
-CLI are one config entry away.
+Code, Codex, and Gemini CLI are configured out of the box; any other ACP
+agent is one config entry away.
 
 Work is organized into threads. A thread is one conversation with one agent
 plus its own workspace: a tab page, a window layout, and optionally a git
@@ -46,7 +46,7 @@ Threads, layouts, and conversations survive restarts (|acp-options|
 - Neovim 0.10 or newer
 - Node.js (the bundled Claude Code and Codex adapters run via npx)
 - git, when using worktrees
-- A logged-in Claude Code or Codex CLI
+- A logged-in Claude Code, Codex, or Gemini CLI
 
 Run |:checkhealth| `acp` after installing.
 
@@ -155,7 +155,10 @@ Defaults: >lua
         cmd = { "npx", "-y", "@agentclientprotocol/codex-acp" },
         icon = "⬡",
       },
-      -- gemini = { cmd = { "gemini", "--experimental-acp" }, icon = "◆" },
+      gemini = {
+        cmd = { "npx", "-y", "@google/gemini-cli", "--experimental-acp" },
+        icon = "◆",
+      },
     },
     -- Agent used when only one is configured or none is picked.
     default_agent = "claude",

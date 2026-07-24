@@ -36,6 +36,9 @@ function M.check()
       "the claude adapter uses your Claude Code login (run `claude` once to authenticate) or ANTHROPIC_API_KEY"
     )
   end
+  if cfg.agents.gemini then
+    health.info("the gemini agent uses your Gemini CLI login (run `gemini` once to authenticate) or GEMINI_API_KEY")
+  end
 
   if vim.fn.executable("git") == 1 then
     local root = util.git_root(vim.fn.getcwd())
