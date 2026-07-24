@@ -60,7 +60,7 @@ M.defaults = {
       -- think/fetch). Trailing spaces are respected: wide nerd-font glyphs
       -- can bake in the spacing they need.
       tool_kinds = {
-        read = "  ",
+        read = " ",
         edit = " ",
       },
       thinking = "✱",

@@ -52,6 +52,16 @@ function T.edit_tool_entry_uses_pencil_glyph()
   eq({ 0xEF, 0x81, 0x80 }, { line:byte(1, 3) }, "edit icon bytes")
 end
 
+function T.read_tool_entry_uses_magnifier_glyph()
+  n = n + 1
+  local thread = h.thread("chat-test-" .. n)
+  local buf = chat.ensure_buf(thread)
+  chat.append(thread, "tool", "Read file.lua", "tc-read", "read")
+  local line = vim.api.nvim_buf_get_lines(buf, 1, 2, false)[1]
+  -- U+F002 (nerd-font magnifying glass) is EF 80 82.
+  eq({ 0xEF, 0x80, 0x82 }, { line:byte(1, 3) }, "read icon bytes")
+end
+
 function T.intraline_diff_marks_changed_span_only()
   n = n + 1
   local thread = h.thread("chat-test-" .. n)
