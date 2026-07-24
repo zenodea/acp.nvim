@@ -16,10 +16,11 @@ worktree. Several agents can work on the same repository at the same time
 without interfering with each other or with you.
 
 Each thread's tab has three columns: the threads sidebar, the agent chat, and
-your editing windows. The sidebar shows a status per thread: `●` working,
-`?` needs you, `✓` done, `✗` failed. Background threads that need attention
-also fire a notification, and `require("acp").statusline()` gives you a
-summary for your statusline.
+your editing windows. The sidebar groups threads by workspace — the main
+checkout first, then one section per worktree — and shows a status per
+thread: an animated spinner while working, `?` needs you, `✓` done, `✗`
+failed. Background threads that need attention also fire a notification, and
+`require("acp").statusline()` gives you a summary for your statusline.
 
 ## Features
 
@@ -62,7 +63,7 @@ Run `:checkhealth acp` after installing.
 | Command            | Action                                                |
 | ------------------ | ----------------------------------------------------- |
 | `:Acp`             | Open the last active thread, or create one if none exist |
-| `:AcpNew [name]`   | Create a thread, asking for the agent and workspace   |
+| `:AcpNew [name]`   | Create a thread: pick the agent, then the workspace (checkout, new worktree, or an existing free worktree) |
 | `:AcpToggleChat`   | Show or hide the chat column                          |
 | `:AcpInterrupt`    | Interrupt the current thread's turn                   |
 | `:checkhealth acp` | Verify agents, git, and Neovim setup                  |

@@ -78,7 +78,7 @@ function Session:finish_start(ok)
   end
 end
 
-local spinner_frames = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
+local spinner_frames = require("acp.util").spinner
 
 ---Animate the chat winbar while the agent process starts up.
 function Session:start_spinner()

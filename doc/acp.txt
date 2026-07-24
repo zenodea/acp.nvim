@@ -32,10 +32,12 @@ worktree. Several agents can work on the same repository at the same time
 without interfering with each other or with you.
 
 Each thread's tab has three columns: the threads sidebar, the agent chat,
-and your editing windows. The sidebar shows a status per thread: `●`
-working, `?` needs you, `✓` done, `✗` failed. Background threads that need
-attention also fire a notification (see |acp-options|), and
-`require("acp").statusline()` gives you a summary for your statusline.
+and your editing windows. The sidebar groups threads by workspace — the
+main checkout first, then one section per worktree — and shows a status
+per thread: an animated spinner while working, `?` needs you, `✓` done,
+`✗` failed. Background threads that need attention also fire a
+notification (see |acp-options|), and `require("acp").statusline()` gives
+you a summary for your statusline.
 
 Threads, layouts, and conversations survive restarts (|acp-options|
 `persist`).
@@ -74,9 +76,10 @@ Or directly: >lua
 :Acp            Open the last active thread, or create one if none exist.
 
                                                                      *:AcpNew*
-:AcpNew [name]  Create a thread. Prompts for the agent and the workspace
-                (current directory or a fresh git worktree). With [name],
-                skips the name prompt.
+:AcpNew [name]  Create a thread. Prompts for the agent and the workspace:
+                the current checkout, a fresh git worktree, or one of the
+                existing worktrees not already claimed by a thread. With
+                [name], skips the name prompt.
 
                                                               *:AcpToggleChat*
 :AcpToggleChat  Show or hide the chat column (chat + input windows) of the
@@ -257,6 +260,7 @@ All groups are defined with `default = true` links and can be overridden:
   AcpSidebarTitle     sidebar title            -> Title
   AcpSidebarHint      sidebar hints            -> Comment
   AcpSidebarBranch    worktree branch lines    -> Comment
+  AcpSidebarGroup     workspace group headers  -> Directory
   AcpStatusWorking    working status           -> DiagnosticWarn
   AcpStatusAttention  needs-you status         -> DiagnosticError
   AcpStatusIdle       done status              -> DiagnosticOk

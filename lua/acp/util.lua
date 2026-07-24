@@ -1,5 +1,9 @@
 local M = {}
 
+---Spinner frames shared by the chat winbar (startup) and the sidebar
+---(working threads).
+M.spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
+
 ---Turn a human name into a filesystem/branch-safe slug.
 ---@param name string
 ---@return string
