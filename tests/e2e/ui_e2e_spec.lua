@@ -23,6 +23,19 @@ T.handshake_and_workspace = H.test("greeting", function(thread)
   eq("idle", thread.status)
 end, { wait_ready = false })
 
+T.ui_windows_refuse_foreign_buffers = H.test("greeting", function(thread)
+  local foreign = vim.api.nvim_create_buf(true, false)
+  for _, role in ipairs({ "sidebar", "chat", "input" }) do
+    local win = H.win(thread, role)
+    eq(true, vim.wo[win].winfixbuf, role .. " has winfixbuf")
+    local before = vim.api.nvim_win_get_buf(win)
+    local ok = pcall(vim.api.nvim_win_set_buf, win, foreign)
+    eq(false, ok, role .. " rejects a foreign buffer")
+    eq(before, vim.api.nvim_win_get_buf(win), role .. " keeps its buffer")
+  end
+  vim.api.nvim_buf_delete(foreign, { force = true })
+end)
+
 T.prompt_streams_to_chat = H.test("greeting", function(thread)
   H.send(thread, "hi")
   H.wait_done(thread)

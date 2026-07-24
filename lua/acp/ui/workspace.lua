@@ -4,6 +4,10 @@ local M = {}
 ---@param role string
 local function mark(win, role)
   vim.w[win].acp_ui = role
+  -- Callers set the window's buffer before marking; from here on the window
+  -- refuses buffer swaps, so file explorers pick a code window instead of
+  -- clobbering the sidebar/chat/input.
+  vim.wo[win].winfixbuf = true
   vim.wo[win].number = false
   vim.wo[win].relativenumber = false
   vim.wo[win].signcolumn = "no"
