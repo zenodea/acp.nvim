@@ -335,7 +335,9 @@ function M.ensure_buf(thread)
     return thread.chat_buf
   end
   local buf = vim.api.nvim_create_buf(false, true)
-  local name = "acp://chat/" .. thread.slug .. "/" .. thread.id
+  -- Slug last: path-shortening statuslines keep the final component, so
+  -- the buffer displays as the thread name instead of a truncated UUID.
+  local name = "acp://chat/" .. thread.slug
   require("acp.util").wipe_named_buf(name)
   vim.api.nvim_buf_set_name(buf, name)
   vim.bo[buf].buftype = "nofile"

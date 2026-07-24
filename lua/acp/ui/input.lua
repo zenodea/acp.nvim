@@ -36,7 +36,7 @@ function M.ensure_buf(thread)
     return thread.input_buf
   end
   local buf = vim.api.nvim_create_buf(false, true)
-  local name = "acp://input/" .. thread.slug .. "/" .. thread.id
+  local name = "acp://input/" .. thread.slug
   require("acp.util").wipe_named_buf(name)
   vim.api.nvim_buf_set_name(buf, name)
   vim.bo[buf].buftype = "nofile"
