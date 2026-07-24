@@ -9,8 +9,10 @@ function M.setup()
     AcpStatusAttention = "DiagnosticError",
     AcpStatusIdle = "DiagnosticOk",
     AcpStatusError = "ErrorMsg",
-    AcpChatUser = "Title",
-    AcpChatAgent = "Function",
+    -- Turn headers get their own hues, distinct from tool-call titles
+    -- (Function): user prompts read as commands, agent headers as values.
+    AcpChatUser = "Statement",
+    AcpChatAgent = "Constant",
     AcpChatTool = "Function",
     AcpChatThinking = "Comment",
     AcpChatMeta = "Comment",
