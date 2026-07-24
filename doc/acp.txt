@@ -205,7 +205,7 @@ Defaults: >lua
         -- execute/think/fetch). Trailing spaces are respected so wide
         -- nerd-font glyphs can bake in the spacing they need.
         tool_kinds = {
-          read = "  ",
+          read = " ",
           edit = " ",
         },
         thinking = "✱",
@@ -258,8 +258,8 @@ All groups are defined with `default = true` links and can be overridden:
   AcpStatusAttention  needs-you status         -> DiagnosticError
   AcpStatusIdle       done status              -> DiagnosticOk
   AcpStatusError      failed status            -> ErrorMsg
-  AcpChatUser         user turn header         -> Title
-  AcpChatAgent        agent turn header        -> Function
+  AcpChatUser         user turn header         -> Statement
+  AcpChatAgent        agent turn header        -> Constant
   AcpChatTool         tool call title          -> Function
   AcpChatThinking     thought chunks           -> Comment
   AcpChatMeta         meta / plan lines        -> Comment
@@ -267,6 +267,10 @@ All groups are defined with `default = true` links and can be overridden:
   AcpChatPermission   permission prompts       -> DiagnosticWarn
   AcpDiffAdd          added diff lines         -> DiffAdd
   AcpDiffDelete       removed diff lines       -> DiffDelete
+  AcpDiffAddText      changed span of a + line -> DiffText
+  AcpDiffDeleteText   changed span of a - line -> DiffText
+  AcpDiffSep          ⋯ hunk gap markers       -> NonText
+  AcpPlanActive       in-progress plan step    -> Title
   AcpChip             context chips            -> Special
 
 ==============================================================================
