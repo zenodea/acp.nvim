@@ -88,12 +88,15 @@ end
 
 ---Lines for a tool call's content items (diffs).
 ---@param content table[]|nil
+---@param max integer|nil line cap; overrides ui.diff_max_lines and, when
+---given, renders even if ui.show_diffs is off (detail view)
 ---@return string[]
-function M.tool_content_lines(content)
+function M.tool_content_lines(content, max)
   local cfg = require("acp.config").options.ui
-  if not cfg.show_diffs or type(content) ~= "table" then
+  if type(content) ~= "table" or (max == nil and not cfg.show_diffs) then
     return {}
   end
+  max = max or cfg.diff_max_lines
   local lines = {}
   local function push(prefix, text)
     for _, l in ipairs(util.lines(text or "")) do
@@ -104,7 +107,7 @@ function M.tool_content_lines(content)
     if item.type == "diff" then
       vim.list_extend(lines, diff_lines(item.oldText, item.newText, cfg.diff_context or 3))
     elseif item.type == "terminal" and item.terminalId then
-      vim.list_extend(lines, require("acp.agent.terminal").render_lines(item.terminalId, cfg.diff_max_lines))
+      vim.list_extend(lines, require("acp.agent.terminal").render_lines(item.terminalId, max))
     elseif item.type == "content" then
       local text = M.content_text(item.content)
       if text ~= "" then
@@ -112,10 +115,10 @@ function M.tool_content_lines(content)
       end
     end
   end
-  if #lines > cfg.diff_max_lines then
+  if #lines > max then
     local total = #lines
-    lines = vim.list_slice(lines, 1, cfg.diff_max_lines)
-    table.insert(lines, string.format("… (%d more lines)", total - cfg.diff_max_lines))
+    lines = vim.list_slice(lines, 1, max)
+    table.insert(lines, string.format("… (%d more lines)", total - max))
   end
   return lines
 end

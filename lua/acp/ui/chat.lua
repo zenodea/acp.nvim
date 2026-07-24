@@ -375,6 +375,9 @@ function M.ensure_buf(thread)
   map("gd", function()
     M.goto_at_cursor(thread)
   end, "Go to the entry's code location")
+  map("<S-CR>", function()
+    M.detail_at_cursor(thread)
+  end, "Full tool-call content in a float")
 
   vim.api.nvim_create_autocmd("CursorMoved", {
     buffer = buf,
@@ -427,6 +430,61 @@ function M.toggle_at_cursor(thread)
     M.toggle_entry(thread, index)
     pcall(vim.api.nvim_win_set_cursor, 0, { st(thread).ranges[index].start + 2, 0 })
   end
+end
+
+---Open the full, untruncated content of the tool call under the cursor in
+---a read-only float (S-CR). q or :q closes it.
+---@param thread Thread
+function M.detail_at_cursor(thread)
+  local index = entry_at_cursor(thread)
+  local entry = index and thread.transcript[index]
+  if not entry or entry.kind ~= "tool" then
+    vim.notify("acp: no tool call under the cursor", vim.log.levels.INFO)
+    return
+  end
+
+  local lines
+  local call = entry.id and thread.session and thread.session.tool_calls and thread.session.tool_calls[entry.id]
+  if call and call.content then
+    local events = require("acp.agent.events")
+    lines = { (call.title or call.kind or "tool") .. " · " .. (call.status or "pending") }
+    if entry.loc then
+      table.insert(lines, entry.loc.path .. (entry.loc.line and (":" .. entry.loc.line) or ""))
+    end
+    table.insert(lines, "")
+    vim.list_extend(lines, events.tool_content_lines(call.content, 100000))
+  else
+    -- No live call state (e.g. restored session): show the rendered text.
+    lines = vim.split(entry.text, "\n", { plain = true })
+  end
+
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.bo[buf].bufhidden = "wipe"
+  vim.bo[buf].swapfile = false
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  vim.bo[buf].modifiable = false
+
+  local width = math.min(100, math.max(vim.o.columns - 8, 20))
+  local height = math.min(math.max(#lines, 3) + 1, math.max(vim.o.lines - 6, 3))
+  local win = vim.api.nvim_open_win(buf, true, {
+    relative = "editor",
+    row = math.floor((vim.o.lines - height) / 2),
+    col = math.floor((vim.o.columns - width) / 2),
+    width = width,
+    height = height,
+    border = "rounded",
+    title = " tool call — q closes ",
+    title_pos = "center",
+  })
+  vim.wo[win].wrap = false
+  vim.api.nvim_win_call(win, function()
+    vim.fn.matchadd("AcpDiffAdd", [[^\s*+ .*]])
+    vim.fn.matchadd("AcpDiffDelete", [[^\s*- .*]])
+    vim.fn.matchadd("AcpDiffSep", [[^\s*⋯\s*$]])
+  end)
+  vim.keymap.set("n", "q", function()
+    pcall(vim.api.nvim_win_close, win, true)
+  end, { buffer = buf, nowait = true, desc = "Close tool-call detail" })
 end
 
 ---Jump to the code location of the tool call under the cursor (gd).

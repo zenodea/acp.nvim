@@ -126,6 +126,10 @@ Chat input:
 Chat transcript:
 
   <CR>          Expand or collapse the entry under the cursor
+  <S-CR>        Open the tool call's full, untruncated content (diffs,
+                terminal output) in a float; `q` or `:q` closes it.
+                Requires a terminal that distinguishes Shift-Enter from
+                Enter (kitty, WezTerm, Ghostty, iTerm2 with CSI u).
   i             Focus the message input
   <C-c>         Interrupt the agent
   gd            Jump to the code location of the tool call under the
