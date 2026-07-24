@@ -129,6 +129,9 @@ function T.detail_float_shows_untruncated_tool_content()
         content = { { type = "diff", oldText = "", newText = table.concat(big, "\n") } },
       },
     },
+    tool_call = function(self, id)
+      return self.tool_calls[id]
+    end,
   }
   chat.append(thread, "tool", "Write big.lua", "tc", "edit")
   vim.api.nvim_win_set_buf(0, buf)

@@ -35,14 +35,7 @@ function M.ensure_buf(thread)
   if thread.input_buf and vim.api.nvim_buf_is_valid(thread.input_buf) then
     return thread.input_buf
   end
-  local buf = vim.api.nvim_create_buf(false, true)
-  local name = "acp://input/" .. thread.slug
-  require("acp.util").wipe_named_buf(name)
-  vim.api.nvim_buf_set_name(buf, name)
-  vim.bo[buf].buftype = "nofile"
-  vim.bo[buf].bufhidden = "hide"
-  vim.bo[buf].swapfile = false
-  vim.bo[buf].filetype = "markdown"
+  local buf = require("acp.util").scratch_buf("acp://input/" .. thread.slug, { filetype = "markdown" })
   thread.input_buf = buf
 
   -- "@partial" completes into whole-file context chips (see context.lua).
@@ -68,28 +61,13 @@ function M.ensure_buf(thread)
     send(thread)
   end, opts("Send message"))
   vim.keymap.set("i", "<C-j>", "<CR>", { buffer = buf, desc = "Insert newline" })
-  vim.keymap.set({ "n", "i" }, "<C-c>", function()
-    if thread.session then
-      thread.session:interrupt()
-    end
-  end, opts("Interrupt Claude"))
+  require("acp.ui.keymaps").apply(buf, thread, { "n", "i" })
   vim.keymap.set("n", "<C-p>", function()
     history(thread, -1)
   end, opts("Previous prompt"))
   vim.keymap.set("n", "<C-n>", function()
     history(thread, 1)
   end, opts("Next prompt"))
-  vim.keymap.set("n", "gm", function()
-    require("acp.agent.session").get(thread):select_config()
-  end, opts("Session config (mode/model)"))
-  vim.keymap.set("n", "gq", function()
-    require("acp.agent.session").get(thread):edit_queue()
-  end, opts("Edit queued prompts"))
-  vim.keymap.set("n", "gf", function()
-    local session = require("acp.agent.session").get(thread)
-    thread.follow = not session:follow_enabled()
-    vim.notify("acp: follow mode " .. (thread.follow and "on" or "off"))
-  end, opts("Toggle follow mode"))
 
   -- "/" on an empty input opens the agent's slash-command picker
   -- (advertised via available_commands_update); otherwise types "/".
@@ -104,9 +82,7 @@ function M.ensure_buf(thread)
     vim.cmd.stopinsert()
     local labels = {}
     for _, c in ipairs(commands) do
-      labels[#labels + 1] = "/"
-        .. c.name
-        .. (c.description and c.description ~= "" and (" — " .. c.description) or "")
+      labels[#labels + 1] = require("acp.util").labeled("/" .. c.name, c.description)
     end
     vim.ui.select(labels, { prompt = "Agent command:" }, function(_, idx)
       if idx then
@@ -161,16 +137,14 @@ function M.append(thread, text)
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   lines[#lines] = lines[#lines] == "" and text or (lines[#lines] .. " " .. text)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-  if not (thread.tab_valid and thread:tab_valid()) then
+  if not thread:tab_valid() then
     return
   end
-  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(thread.tabpage)) do
-    if vim.w[win].acp_ui == "input" then
-      vim.api.nvim_set_current_win(win)
-      pcall(vim.api.nvim_win_set_cursor, win, { #lines, math.max(#lines[#lines] - 1, 0) })
-      vim.cmd("startinsert!")
-      return
-    end
+  local win = require("acp.ui.workspace").find_ui_win(thread.tabpage, "input")
+  if win then
+    vim.api.nvim_set_current_win(win)
+    pcall(vim.api.nvim_win_set_cursor, win, { #lines, math.max(#lines[#lines] - 1, 0) })
+    vim.cmd("startinsert!")
   end
 end
 
@@ -180,12 +154,10 @@ function M.focus(thread)
   if not thread:tab_valid() then
     return
   end
-  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(thread.tabpage)) do
-    if vim.w[win].acp_ui == "input" then
-      vim.api.nvim_set_current_win(win)
-      vim.cmd.startinsert()
-      return
-    end
+  local win = require("acp.ui.workspace").find_ui_win(thread.tabpage, "input")
+  if win then
+    vim.api.nvim_set_current_win(win)
+    vim.cmd.startinsert()
   end
 end
 

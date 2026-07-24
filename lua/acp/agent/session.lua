@@ -15,7 +15,6 @@ local events = require("acp.agent.events")
 ---@field last_assistant_text string
 ---@field loading boolean session/load replay in flight (updates ignored)
 ---@field spinner string|nil current startup spinner frame (winbar)
----@field spinner_timer uv_timer_t|nil
 local Session = {}
 Session.__index = Session
 
@@ -49,9 +48,8 @@ end
 
 ---@return {cmd: string[], env: table|nil}|nil def, string|nil err
 function Session:agent_def()
-  local cfg = require("acp.config").options
-  local name = self.thread.agent or cfg.default_agent
-  local def = cfg.agents[name]
+  local name = self.thread:agent_name()
+  local def = require("acp.config").options.agents[name]
   if not def or type(def.cmd) ~= "table" then
     return nil, "no ACP agent configured under '" .. tostring(name) .. "'"
   end
@@ -78,48 +76,37 @@ function Session:finish_start(ok)
   end
 end
 
-local spinner_frames = require("acp.util").spinner
-
 ---Animate the chat winbar while the agent process starts up.
 function Session:start_spinner()
-  if self.spinner_timer then
-    return
-  end
-  local uv = vim.uv or vim.loop
-  local timer = uv.new_timer()
-  if not timer then
-    return
-  end
-  self.spinner_timer = timer
-  local i = 0
-  timer:start(
-    0,
-    120,
-    vim.schedule_wrap(function()
-      i = i + 1
-      self.spinner = spinner_frames[(i % #spinner_frames) + 1]
+  self._spin = self._spin
+    or require("acp.util").spinner_timer(function(frame)
+      self.spinner = frame
       require("acp.ui.workspace").update_winbar(self.thread)
     end)
-  )
+  self._spin.start()
 end
 
 function Session:stop_spinner()
-  if self.spinner_timer then
-    self.spinner_timer:stop()
-    self.spinner_timer:close()
-    self.spinner_timer = nil
+  if self._spin then
+    self._spin.stop()
   end
   self.spinner = nil
   require("acp.ui.workspace").update_winbar(self.thread)
 end
 
+---@param msg string
+---@return string msg with the captured agent stderr tail, if any
+function Session:with_stderr(msg)
+  if self.stderr_tail and self.stderr_tail ~= "" then
+    return msg .. "\n" .. self.stderr_tail
+  end
+  return msg
+end
+
 ---@param err table|nil
 ---@param context string
 function Session:fail_start(err, context)
-  local msg = context .. ": " .. ((err and err.message) or "unknown error")
-  if self.stderr_tail and self.stderr_tail ~= "" then
-    msg = msg .. "\n" .. self.stderr_tail
-  end
+  local msg = self:with_stderr(context .. ": " .. ((err and err.message) or "unknown error"))
   chat().append(self.thread, "error", msg)
   self.thread:set_status("error", context)
   if self.rpc then
@@ -166,7 +153,7 @@ function Session:open_session()
     -- in case the load fails.
     local backup = self.thread.transcript
     self.thread.transcript = {}
-    require("acp.ui.chat").replay(self.thread)
+    chat().replay(self.thread)
     local load_params = vim.tbl_extend("force", params, { sessionId = self.thread.session_id })
     self.rpc:request("session/load", load_params, function(result, err)
       self.loading = false
@@ -174,7 +161,7 @@ function Session:open_session()
       if err then
         -- Stale session on the agent side: fall back to a fresh one.
         self.thread.transcript = backup
-        require("acp.ui.chat").replay(self.thread)
+        chat().replay(self.thread)
         self.thread.session_id = nil
         self:open_session()
         return
@@ -214,7 +201,7 @@ end
 
 ---@return string
 function Session:agent_name()
-  return self.thread.agent or require("acp.config").options.default_agent
+  return self.thread:agent_name()
 end
 
 ---Switch a fresh session to this agent's favourite model (the one last
@@ -300,15 +287,7 @@ function Session:select_config(retried)
   end
   local labels = {}
   for _, opt in ipairs(options) do
-    local current = tostring(opt.currentValue)
-    if opt.type == "select" then
-      for _, o in ipairs(opt.options or {}) do
-        if o.value == opt.currentValue then
-          current = o.name or o.value
-        end
-      end
-    end
-    labels[#labels + 1] = (opt.name or opt.id) .. ": " .. current
+    labels[#labels + 1] = (opt.name or opt.id) .. ": " .. self:option_label(opt)
   end
   vim.ui.select(labels, { prompt = "Session config:" }, function(_, idx)
     if not idx then
@@ -323,9 +302,7 @@ function Session:select_config(retried)
     local value_labels = {}
     for _, o in ipairs(values) do
       local mark = o.value == opt.currentValue and " (current)" or ""
-      value_labels[#value_labels + 1] = (o.name or o.value)
-        .. ((o.description and o.description ~= "") and (" — " .. o.description) or "")
-        .. mark
+      value_labels[#value_labels + 1] = require("acp.util").labeled(o.name or o.value, o.description) .. mark
     end
     vim.ui.select(value_labels, { prompt = (opt.name or opt.id) .. ":" }, function(_, vidx)
       if vidx then
@@ -348,8 +325,7 @@ function Session:try_authenticate(orig_err)
   )
   local labels = {}
   for _, m in ipairs(methods) do
-    labels[#labels + 1] = (m.name or m.id)
-      .. ((m.description and m.description ~= "") and (" — " .. m.description) or "")
+    labels[#labels + 1] = require("acp.util").labeled(m.name or m.id, m.description)
   end
   vim.ui.select(labels, { prompt = "Authenticate with:" }, function(_, idx)
     if not idx then
@@ -559,136 +535,9 @@ function Session:queue_changed()
   require("acp.ui.workspace").update_input_winbar(self.thread)
 end
 
----Separator line between prompts in the queue editor buffer.
-local QUEUE_SEP = string.rep("─", 40)
-
----Inspect and edit the queued prompts (gq): a scratch float holding the
----plain text of every prompt, separated by ─ lines. Edit, reorder, or
----delete blocks like any buffer; closing it (or :w) applies the queue.
+---Inspect and edit the queued prompts (gq); see acp.ui.queue.
 function Session:edit_queue()
-  if #self.queue == 0 then
-    vim.notify("acp: no queued prompts", vim.log.levels.INFO)
-    return
-  end
-
-  local lines = {}
-  for i, text in ipairs(self.queue) do
-    if i > 1 then
-      table.insert(lines, QUEUE_SEP)
-    end
-    vim.list_extend(lines, vim.split(text, "\n", { plain = true }))
-  end
-
-  local name = "acp://queue/" .. self.thread.slug
-  require("acp.util").wipe_named_buf(name)
-  local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_buf_set_name(buf, name)
-  vim.bo[buf].buftype = "acwrite" -- lets :w apply without closing
-  vim.bo[buf].bufhidden = "wipe"
-  vim.bo[buf].swapfile = false
-  vim.bo[buf].filetype = "markdown"
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-  vim.bo[buf].modified = false
-  -- The queue is applied when the window closes, so the buffer is never
-  -- "unsaved": keep 'modified' off so a plain :q never trips E37.
-  vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
-    buffer = buf,
-    callback = function()
-      vim.bo[buf].modified = false
-    end,
-  })
-
-  local width = math.min(80, math.max(vim.o.columns - 8, 20))
-  local height = math.min(math.max(#lines, 3) + 1, math.max(vim.o.lines - 6, 3))
-  vim.api.nvim_open_win(buf, true, {
-    relative = "editor",
-    row = math.floor((vim.o.lines - height) / 2),
-    col = math.floor((vim.o.columns - width) / 2),
-    width = width,
-    height = height,
-    border = "rounded",
-    title = " queued prompts — :q applies · :w applies and stays ",
-    title_pos = "center",
-  })
-
-  -- Prompts sent while the editor is open (recorded by flush_queue) must
-  -- not be re-queued when the buffer is applied.
-  local flushed = {}
-  self._queue_flushed = flushed
-
-  local function parse()
-    local prompts, block = {}, {}
-    local function push()
-      local s, e = 1, #block
-      while s <= e and block[s]:match("^%s*$") do
-        s = s + 1
-      end
-      while e >= s and block[e]:match("^%s*$") do
-        e = e - 1
-      end
-      if s <= e then
-        table.insert(prompts, table.concat(vim.list_slice(block, s, e), "\n"))
-      end
-      block = {}
-    end
-    -- "─" is multibyte, so quantifiers can't apply to the whole char: match
-    -- three literal ─ then allow only ─ bytes/whitespace to the end.
-    local sep_pat = "^%s*───[─%s]*$"
-    for _, l in ipairs(vim.api.nvim_buf_get_lines(buf, 0, -1, false)) do
-      if l:match(sep_pat) then
-        push()
-      else
-        table.insert(block, l)
-      end
-    end
-    push()
-    local out = {}
-    for _, p in ipairs(prompts) do
-      local sent
-      for j, f in ipairs(flushed) do
-        if f == p then
-          sent = j
-          break
-        end
-      end
-      if sent then
-        table.remove(flushed, sent)
-      else
-        table.insert(out, p)
-      end
-    end
-    return out
-  end
-
-  local applied = false
-  local function apply()
-    if applied or not vim.api.nvim_buf_is_valid(buf) then
-      return
-    end
-    self.queue = parse()
-    self:queue_changed()
-  end
-
-  vim.api.nvim_create_autocmd("BufWriteCmd", {
-    buffer = buf,
-    desc = "Apply the edited prompt queue",
-    callback = function()
-      self.queue = parse()
-      self:queue_changed()
-      vim.bo[buf].modified = false
-    end,
-  })
-  vim.api.nvim_create_autocmd("BufWipeout", {
-    buffer = buf,
-    desc = "Apply the edited prompt queue",
-    callback = function()
-      apply()
-      applied = true
-      if self._queue_flushed == flushed then
-        self._queue_flushed = nil
-      end
-    end,
-  })
+  require("acp.ui.queue").open(self)
 end
 
 ---@param text string
@@ -871,20 +720,28 @@ function Session:on_request(method, params, respond)
   end
 end
 
----Label of the currently selected model, if the agent exposes one.
----@return string|nil
-function Session:model_label()
-  for _, opt in ipairs(self.config_options or {}) do
-    if opt.category == "model" then
-      local label = tostring(opt.currentValue)
-      if opt.type == "select" then
-        for _, o in ipairs(opt.options or {}) do
-          if o.value == opt.currentValue then
-            label = o.name or o.value
-          end
-        end
+---Display label of a config option's current value.
+---@param opt table
+---@return string
+function Session:option_label(opt)
+  local label = tostring(opt.currentValue)
+  if opt.type == "select" then
+    for _, o in ipairs(opt.options or {}) do
+      if o.value == opt.currentValue then
+        label = o.name or o.value
       end
-      return label
+    end
+  end
+  return label
+end
+
+---Label of the current value of the first option in `category`, if any.
+---@param category string
+---@return string|nil
+function Session:option_label_for(category)
+  for _, opt in ipairs(self.config_options or {}) do
+    if opt.category == category then
+      return self:option_label(opt)
     end
   end
 end
@@ -896,9 +753,16 @@ function Session:ensure_turn_header()
     return
   end
   self.turn_headered = true
-  local provider = self.thread.agent or require("acp.config").options.default_agent
-  local model = self:model_label()
+  local provider = self.thread:agent_name()
+  local model = self:option_label_for("model")
   chat().append(self.thread, "agent", provider .. (model and (" · " .. model) or ""))
+end
+
+---Live state of a tool call, if this session still holds it.
+---@param id string
+---@return table|nil
+function Session:tool_call(id)
+  return self.tool_calls[id]
 end
 
 ---@return boolean
@@ -925,11 +789,24 @@ function Session:maybe_follow(locations)
 end
 
 ---Re-render every tool call embedding a terminal (new output arrived).
+---Debounced: chatty commands emit many chunks per second and each refresh
+---re-renders whole entries.
 function Session:refresh_terminal_tools()
+  if self._term_refresh then
+    return
+  end
+  self._term_refresh = true
+  vim.defer_fn(function()
+    self._term_refresh = false
+    self:do_refresh_terminal_tools()
+  end, 80)
+end
+
+function Session:do_refresh_terminal_tools()
   for id, call in pairs(self.tool_calls) do
     for _, item in ipairs(call.content or {}) do
       if item.type == "terminal" then
-        require("acp.ui.chat").update_by_id(self.thread, id, events.tool_text(call))
+        chat().update_by_id(self.thread, id, events.tool_text(call))
         break
       end
     end
@@ -962,7 +839,8 @@ function Session:on_notification(method, params)
     local text = events.content_text(u.content)
     if text ~= "" then
       self:ensure_turn_header()
-      self.last_assistant_text = self.last_assistant_text .. text
+      -- Only the tail is ever inspected (question heuristic at turn end).
+      self.last_assistant_text = (self.last_assistant_text .. text):sub(-256)
       chat().stream(self.thread, "text", text)
     end
   elseif kind == "agent_thought_chunk" then
@@ -993,6 +871,9 @@ function Session:on_notification(method, params)
       for k, v in pairs(u) do
         if k ~= "sessionUpdate" and k ~= "toolCallId" then
           call[k] = v
+          if k == "content" then
+            call._lines = nil -- re-render the diff with the new content
+          end
         end
       end
       self.tool_calls[id] = call
@@ -1050,11 +931,7 @@ function Session:on_exit(code)
     return
   end
   if was_busy then
-    local detail = "agent exited unexpectedly (code " .. code .. ")"
-    if self.stderr_tail and self.stderr_tail ~= "" then
-      detail = detail .. "\n" .. self.stderr_tail
-    end
-    chat().append(self.thread, "error", detail)
+    chat().append(self.thread, "error", self:with_stderr("agent exited unexpectedly (code " .. code .. ")"))
     self.thread:set_status("error", "agent exited")
   end
 end

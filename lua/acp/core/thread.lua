@@ -16,7 +16,7 @@ local util = require("acp.util")
 ---@field status_detail string|nil  -- e.g. "permission: Bash", "asked a question"
 ---@field cwd string               -- worktree path or project root
 ---@field worktree {path: string, branch: string}|nil
----@field session_id string|nil    -- Claude Code session id, for --resume
+---@field session_id string|nil    -- ACP session id, for session/load and resume
 ---@field transcript TranscriptEntry[]
 ---@field layout table|nil         -- serialized code-area layout
 ---@field created_at integer
@@ -112,6 +112,12 @@ function Thread:set_status(status, detail)
 end
 
 ---@return boolean
+---Effective agent name (the thread's own, or the configured default).
+---@return string
+function Thread:agent_name()
+  return self.agent or require("acp.config").options.default_agent
+end
+
 function Thread:tab_valid()
   return self.tabpage ~= nil and vim.api.nvim_tabpage_is_valid(self.tabpage)
 end

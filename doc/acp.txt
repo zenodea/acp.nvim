@@ -273,7 +273,6 @@ All groups are defined with `default = true` links and can be overridden:
 
   AcpSidebarTitle     sidebar title            -> Title
   AcpSidebarHint      sidebar hints            -> Comment
-  AcpSidebarBranch    worktree branch lines    -> Comment
   AcpSidebarGroup     workspace group headers  -> Directory
   AcpStatusWorking    working status           -> DiagnosticWarn
   AcpStatusAttention  needs-you status         -> DiagnosticError

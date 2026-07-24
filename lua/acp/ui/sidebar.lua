@@ -13,9 +13,6 @@ local group_map = {}
 local name_lines = {}
 ---@type table<integer, boolean>
 local name_set = {}
----@type table<integer, integer> win -> last snapped line (for direction)
-local last_pos = {}
-
 ---Snap the cursor of the current window to the nearest thread-name line,
 ---searching in the direction the cursor was moving.
 function M.snap()
@@ -23,32 +20,9 @@ function M.snap()
   if vim.api.nvim_win_get_buf(win) ~= M.buf or #name_lines == 0 then
     return
   end
-  local lnum = vim.api.nvim_win_get_cursor(win)[1]
-  if name_set[lnum] then
-    last_pos[win] = lnum
-    return
-  end
-  local prev = last_pos[win]
-  local target
-  if prev and lnum > prev then -- moving down: next name line at/after cursor
-    for _, l in ipairs(name_lines) do
-      if l >= lnum then
-        target = l
-        break
-      end
-    end
-    target = target or name_lines[#name_lines]
-  else -- moving up (or unknown): previous name line at/before cursor
-    for i = #name_lines, 1, -1 do
-      if name_lines[i] <= lnum then
-        target = name_lines[i]
-        break
-      end
-    end
-    target = target or name_lines[1]
-  end
-  pcall(vim.api.nvim_win_set_cursor, win, { target, 0 })
-  last_pos[win] = target
+  require("acp.util").snap_cursor(function(l)
+    return name_set[l] == true
+  end)
 end
 
 ---Workspace of the group under the cursor: false for the main checkout,
@@ -78,7 +52,7 @@ function M.reveal(thread_id)
   end
   for _, win in ipairs(vim.fn.win_findbuf(M.buf)) do
     pcall(vim.api.nvim_win_set_cursor, win, { line, 0 })
-    last_pos[win] = line
+    vim.w[win].acp_last_pos = line
   end
 end
 
@@ -87,12 +61,7 @@ function M.ensure_buf()
   if M.buf and vim.api.nvim_buf_is_valid(M.buf) then
     return M.buf
   end
-  local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_buf_set_name(buf, "acp://threads")
-  vim.bo[buf].buftype = "nofile"
-  vim.bo[buf].bufhidden = "hide"
-  vim.bo[buf].swapfile = false
-  vim.bo[buf].filetype = "acp-threads"
+  local buf = require("acp.util").scratch_buf("acp://threads", { filetype = "acp-threads" })
   vim.bo[buf].modifiable = false
   M.buf = buf
 
@@ -142,35 +111,14 @@ function M.ensure_buf()
 end
 
 ---Spinner state for threads in the "working" status.
-local frame = 1
-local spin_timer = nil
-
-local function stop_spin()
-  if spin_timer then
-    spin_timer:stop()
-    spin_timer:close()
-    spin_timer = nil
+local frame = require("acp.util").spinner[1]
+local spin = require("acp.util").spinner_timer(function(f)
+  frame = f
+  -- Advancing the glyph only matters when the sidebar is visible.
+  if M.buf and #vim.fn.win_findbuf(M.buf) > 0 then
+    M.render()
   end
-end
-
-local function start_spin()
-  if spin_timer then
-    return
-  end
-  local uv = vim.uv or vim.loop
-  spin_timer = uv.new_timer()
-  if not spin_timer then
-    return
-  end
-  spin_timer:start(
-    120,
-    120,
-    vim.schedule_wrap(function()
-      frame = (frame % #require("acp.util").spinner) + 1
-      M.render()
-    end)
-  )
-end
+end)
 
 ---Threads grouped by workspace: the main checkout first, then one group
 ---per worktree (named after its directory), in name order.
@@ -216,7 +164,6 @@ function M.render()
   local options = require("acp.config").options
   local cfg = options.ui
   local hls = require("acp.ui.highlights")
-  local spinner = require("acp.util").spinner
 
   local lines = { " ACP", "" }
   local marks = { { 0, "AcpSidebarTitle" } }
@@ -238,7 +185,7 @@ function M.render()
     for _, t in ipairs(group.threads) do
       local icon = cfg.icons[t.status] or "·"
       if t.status == "working" then
-        icon = spinner[frame]
+        icon = frame
         working = true
       end
       local agent_def = options.agents[t.agent or options.default_agent]
@@ -270,9 +217,9 @@ function M.render()
   table.insert(marks, { #lines - 1, "AcpSidebarHint" })
 
   if working then
-    start_spin()
+    spin.start()
   else
-    stop_spin()
+    spin.stop()
   end
 
   vim.bo[buf].modifiable = true
@@ -290,7 +237,7 @@ function M.render()
 
   -- Content shifted: re-snap every window currently showing the sidebar.
   for _, win in ipairs(vim.fn.win_findbuf(buf)) do
-    last_pos[win] = nil
+    vim.w[win].acp_last_pos = nil
     vim.api.nvim_win_call(win, M.snap)
   end
 end

@@ -10,7 +10,7 @@ M.root = nil
 ---@type table<string, fun(...)[]>
 local listeners = {}
 
----Subscribe to registry events: "status", "threads" (list changed), "any".
+---Subscribe to registry events: "status", "threads" (list changed), "state".
 ---@param event string
 ---@param fn fun(...)
 function M.on(event, fn)
@@ -20,14 +20,12 @@ end
 
 ---@param event string
 function M.emit(event, ...)
-  for _, ev in ipairs({ event, "any" }) do
-    for _, fn in ipairs(listeners[ev] or {}) do
-      local ok, err = pcall(fn, ...)
-      if not ok then
-        vim.schedule(function()
-          vim.notify("acp listener error: " .. tostring(err), vim.log.levels.ERROR)
-        end)
-      end
+  for _, fn in ipairs(listeners[event] or {}) do
+    local ok, err = pcall(fn, ...)
+    if not ok then
+      vim.schedule(function()
+        vim.notify("acp listener error: " .. tostring(err), vim.log.levels.ERROR)
+      end)
     end
   end
 end

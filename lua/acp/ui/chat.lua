@@ -45,7 +45,7 @@ end
 ---@return string[]
 local function entry_lines(icons, entry, collapsed)
   local kind, text = entry.kind, entry.text
-  local body = vim.split(text, "\n", { plain = true })
+  local body = require("acp.util").lines(text)
   -- Every entry starts with one blank line, so completed actions are always
   -- followed by an empty line once the next entry lands.
   if kind == "user" then
@@ -175,6 +175,19 @@ local function apply_intraline_hl(buf, start, lines)
   end
 end
 
+---Diff-line highlight group for a rendered line, if any.
+---@param l string
+---@return string|nil
+local function diff_line_group(l)
+  if l:match("^%s*%+ ") then
+    return "AcpDiffAdd"
+  elseif l:match("^%s*%- ") then
+    return "AcpDiffDelete"
+  elseif l:match("^%s*⋯%s*$") then
+    return "AcpDiffSep"
+  end
+end
+
 ---@param buf integer
 ---@param start integer 0-based first line of the entry
 ---@param lines string[]
@@ -188,14 +201,11 @@ local function apply_hl(buf, start, lines, kind)
   local hl = kind_hl[kind]
   for i, l in ipairs(lines) do
     local lnum = start + i - 1
+    local diff_group = diff_line_group(l)
     if kind == "tool" and i == 2 then
       vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { line_hl_group = "AcpChatTool", priority = 90 })
-    elseif l:match("^%s*%+ ") then
-      vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { line_hl_group = "AcpDiffAdd", priority = 95 })
-    elseif l:match("^%s*%- ") then
-      vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { line_hl_group = "AcpDiffDelete", priority = 95 })
-    elseif l:match("^%s*⋯%s*$") then
-      vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { line_hl_group = "AcpDiffSep", priority = 95 })
+    elseif diff_group then
+      vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { line_hl_group = diff_group, priority = 95 })
     elseif kind == "plan" and l:match("^%s*◐") then
       -- The in-progress step stands out from the dimmed rest of the plan.
       vim.api.nvim_buf_set_extmark(buf, ns, lnum, 0, { line_hl_group = "AcpPlanActive", priority = 95 })
@@ -251,11 +261,24 @@ local function rerender(thread, index)
   end
   local icons = require("acp.config").options.ui.icons
   local lines = entry_lines(icons, entry, is_collapsed(s, entry.kind, index))
+  -- Streaming appends re-render per chunk: skip when nothing changed, and
+  -- replace buffer lines only from the first divergence (usually just the
+  -- tail of the entry).
+  local old = range.lines or {}
+  local d = 1
+  while d <= #old and d <= #lines and old[d] == lines[d] do
+    d = d + 1
+  end
+  if d > #lines and #lines == range.count then
+    range.lines = lines
+    return
+  end
   vim.bo[buf].modifiable = true
-  vim.api.nvim_buf_set_lines(buf, range.start, range.start + range.count, false, lines)
+  vim.api.nvim_buf_set_lines(buf, range.start + d - 1, range.start + range.count, false, vim.list_slice(lines, d))
   vim.bo[buf].modifiable = false
   vim.api.nvim_buf_clear_namespace(buf, ns, range.start, range.start + #lines)
   apply_hl(buf, range.start, lines, entry.kind)
+  range.lines = lines
   local delta = #lines - range.count
   range.count = #lines
   if delta ~= 0 then
@@ -266,48 +289,14 @@ local function rerender(thread, index)
   update_pad(buf)
 end
 
----@type table<integer, integer> win -> last snapped line (for direction)
-local last_pos = {}
-
----Blank lines are separators, not content: keep the cursor on content lines,
----snapping in the direction it was moving (same feel as the sidebar).
+---Blank lines are separators, not content: keep the cursor on content
+---lines, snapping in the direction it was moving.
 local function snap()
-  local win = vim.api.nvim_get_current_win()
-  local buf = vim.api.nvim_win_get_buf(win)
-  local pos = vim.api.nvim_win_get_cursor(win)
-  local lnum = pos[1]
-  local function blank(l)
+  local buf = vim.api.nvim_get_current_buf()
+  require("acp.util").snap_cursor(function(l)
     local text = vim.api.nvim_buf_get_lines(buf, l - 1, l, false)[1]
-    return text == nil or text == ""
-  end
-  if not blank(lnum) then
-    last_pos[win] = lnum
-    return
-  end
-  local prev = last_pos[win]
-  local down = prev ~= nil and lnum > prev
-  local total = vim.api.nvim_buf_line_count(buf)
-  local step = down and 1 or -1
-  local target
-  for l = lnum + step, down and total or 1, step do
-    if not blank(l) then
-      target = l
-      break
-    end
-  end
-  if not target then -- nothing further that way: search back the other way
-    for l = lnum - step, down and 1 or total, -step do
-      if not blank(l) then
-        target = l
-        break
-      end
-    end
-  end
-  if target then
-    local text = vim.api.nvim_buf_get_lines(buf, target - 1, target, false)[1] or ""
-    pcall(vim.api.nvim_win_set_cursor, win, { target, math.min(pos[2], math.max(#text - 1, 0)) })
-    last_pos[win] = target
-  end
+    return text ~= nil and text ~= ""
+  end)
 end
 
 ---Stick-to-bottom scrolling: a window follows the stream only while its
@@ -334,18 +323,12 @@ function M.ensure_buf(thread)
   if thread.chat_buf and vim.api.nvim_buf_is_valid(thread.chat_buf) then
     return thread.chat_buf
   end
-  local buf = vim.api.nvim_create_buf(false, true)
   -- Slug last: path-shortening statuslines keep the final component, so
   -- the buffer displays as the thread name instead of a truncated UUID.
-  local name = "acp://chat/" .. thread.slug
-  require("acp.util").wipe_named_buf(name)
-  vim.api.nvim_buf_set_name(buf, name)
-  vim.bo[buf].buftype = "nofile"
-  vim.bo[buf].bufhidden = "hide"
-  vim.bo[buf].swapfile = false
-  vim.bo[buf].filetype = "markdown"
+  local buf = require("acp.util").scratch_buf("acp://chat/" .. thread.slug, { filetype = "markdown" })
   vim.bo[buf].modifiable = false
   thread.chat_buf = buf
+  require("acp.ui.keymaps").apply(buf, thread, "n")
 
   local function map(lhs, fn, desc)
     vim.keymap.set("n", lhs, fn, { buffer = buf, desc = desc, nowait = true })
@@ -353,22 +336,6 @@ function M.ensure_buf(thread)
   map("i", function()
     require("acp.ui.input").focus(thread)
   end, "Focus message input")
-  map("<C-c>", function()
-    if thread.session then
-      thread.session:interrupt()
-    end
-  end, "Interrupt agent")
-  map("gm", function()
-    require("acp.agent.session").get(thread):select_config()
-  end, "Session config (mode/model)")
-  map("gq", function()
-    require("acp.agent.session").get(thread):edit_queue()
-  end, "Edit queued prompts")
-  map("gf", function()
-    local session = require("acp.agent.session").get(thread)
-    thread.follow = not session:follow_enabled()
-    vim.notify("acp: follow mode " .. (thread.follow and "on" or "off"))
-  end, "Toggle follow mode")
   map("<CR>", function()
     M.toggle_at_cursor(thread)
   end, "Expand/collapse entry")
@@ -444,7 +411,7 @@ function M.detail_at_cursor(thread)
   end
 
   local lines
-  local call = entry.id and thread.session and thread.session.tool_calls and thread.session.tool_calls[entry.id]
+  local call = entry.id and thread.session and thread.session:tool_call(entry.id)
   if call and call.content then
     local events = require("acp.agent.events")
     lines = { (call.title or call.kind or "tool") .. " · " .. (call.status or "pending") }
@@ -455,33 +422,24 @@ function M.detail_at_cursor(thread)
     vim.list_extend(lines, events.tool_content_lines(call.content, 100000))
   else
     -- No live call state (e.g. restored session): show the rendered text.
-    lines = vim.split(entry.text, "\n", { plain = true })
+    lines = require("acp.util").lines(entry.text)
   end
 
-  local buf = vim.api.nvim_create_buf(false, true)
-  vim.bo[buf].bufhidden = "wipe"
-  vim.bo[buf].swapfile = false
+  local util = require("acp.util")
+  local buf = util.scratch_buf(nil, { bufhidden = "wipe" })
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.bo[buf].modifiable = false
 
-  local width = math.min(100, math.max(vim.o.columns - 8, 20))
-  local height = math.min(math.max(#lines, 3) + 1, math.max(vim.o.lines - 6, 3))
-  local win = vim.api.nvim_open_win(buf, true, {
-    relative = "editor",
-    row = math.floor((vim.o.lines - height) / 2),
-    col = math.floor((vim.o.columns - width) / 2),
-    width = width,
-    height = height,
-    border = "rounded",
-    title = " tool call — q closes ",
-    title_pos = "center",
-  })
+  local win = util.centered_float(buf, { max_width = 100, lines = #lines, title = " tool call — q closes " })
   vim.wo[win].wrap = false
-  vim.api.nvim_win_call(win, function()
-    vim.fn.matchadd("AcpDiffAdd", [[^\s*+ .*]])
-    vim.fn.matchadd("AcpDiffDelete", [[^\s*- .*]])
-    vim.fn.matchadd("AcpDiffSep", [[^\s*⋯\s*$]])
-  end)
+  -- Same diff colouring as the chat, intra-line accents included.
+  for i, l in ipairs(lines) do
+    local group = diff_line_group(l)
+    if group then
+      vim.api.nvim_buf_set_extmark(buf, ns, i - 1, 0, { line_hl_group = group, priority = 95 })
+    end
+  end
+  apply_intraline_hl(buf, 0, lines)
   vim.keymap.set("n", "q", function()
     pcall(vim.api.nvim_win_close, win, true)
   end, { buffer = buf, nowait = true, desc = "Close tool-call detail" })
@@ -594,6 +552,12 @@ function M.update_by_id(thread, id, text)
   autoscroll(thread, M.ensure_buf(thread))
   require("acp.persist.store").save_debounced()
   return true
+end
+
+---Drop a deleted thread's render state.
+---@param thread Thread
+function M.forget(thread)
+  state[thread.id] = nil
 end
 
 ---Re-render the whole transcript into the chat buffer (used on restore).
