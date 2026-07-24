@@ -36,6 +36,32 @@ T.ui_windows_refuse_foreign_buffers = H.test("greeting", function(thread)
   vim.api.nvim_buf_delete(foreign, { force = true })
 end)
 
+T.file_open_lands_in_the_code_window = H.test("greeting", function(thread)
+  -- The contract window pickers rely on: exactly one usable window (normal
+  -- empty buffer, no winfixbuf) — the [No Name] code window.
+  local usable = {}
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(thread.tabpage)) do
+    local buf = vim.api.nvim_win_get_buf(win)
+    if vim.api.nvim_win_get_config(win).relative == "" and vim.bo[buf].buftype == "" and not vim.wo[win].winfixbuf then
+      table.insert(usable, win)
+    end
+  end
+  eq(1, #usable, "exactly one pickable window")
+  eq("", vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(usable[1])), "it is the [No Name] window")
+  -- Opening a file there works and leaves every plugin window untouched.
+  local target = vim.fn.tempname()
+  vim.fn.writefile({ "hello" }, target)
+  vim.api.nvim_win_call(usable[1], function()
+    vim.cmd.edit(target)
+  end)
+  eq(vim.fn.resolve(target), vim.fn.resolve(vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(usable[1]))))
+  for _, role in ipairs({ "sidebar", "chat", "input" }) do
+    local buf = vim.api.nvim_win_get_buf(H.win(thread, role))
+    eq(true, vim.api.nvim_buf_get_name(buf):find("acp://", 1, true) ~= nil, role .. " untouched")
+  end
+  vim.fn.delete(target)
+end)
+
 T.prompt_streams_to_chat = H.test("greeting", function(thread)
   H.send(thread, "hi")
   H.wait_done(thread)
