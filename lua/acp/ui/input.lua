@@ -45,6 +45,21 @@ function M.ensure_buf(thread)
   vim.bo[buf].filetype = "markdown"
   thread.input_buf = buf
 
+  -- "@partial" completes into whole-file context chips (see context.lua).
+  vim.b[buf].acp_cwd = thread.cwd
+  vim.bo[buf].completefunc = "v:lua.require'acp.context'.complete"
+  vim.api.nvim_create_autocmd({ "TextChangedI", "TextChangedP" }, {
+    buffer = buf,
+    desc = "@ file completion",
+    callback = function()
+      local line = vim.api.nvim_get_current_line()
+      local col = vim.api.nvim_win_get_cursor(0)[2]
+      if line:sub(1, col):find("@[^%s@]*$") then
+        vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-x><C-u>", true, false, true), "n", false)
+      end
+    end,
+  })
+
   local opts = function(desc)
     return { buffer = buf, desc = desc, nowait = true }
   end
@@ -135,6 +150,28 @@ function M.ensure_buf(thread)
     end
   end, opts("Insert register (chips file yanks)"))
   return buf
+end
+
+---Append text (e.g. a context chip) to the input and focus it, cursor at
+---the end ready to keep typing.
+---@param thread Thread
+---@param text string
+function M.append(thread, text)
+  local buf = M.ensure_buf(thread)
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  lines[#lines] = lines[#lines] == "" and text or (lines[#lines] .. " " .. text)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  if not (thread.tab_valid and thread:tab_valid()) then
+    return
+  end
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(thread.tabpage)) do
+    if vim.w[win].acp_ui == "input" then
+      vim.api.nvim_set_current_win(win)
+      pcall(vim.api.nvim_win_set_cursor, win, { #lines, math.max(#lines[#lines] - 1, 0) })
+      vim.cmd("startinsert!")
+      return
+    end
+  end
 end
 
 ---Focus the input window of the thread's tab (if visible).

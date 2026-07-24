@@ -172,6 +172,16 @@ function M.setup(opts)
       M.focus_threads()
     end, { desc = "ACP: focus threads sidebar" })
   end
+  if keymaps.selection then
+    vim.keymap.set("x", keymaps.selection, function()
+      M.add_selection()
+    end, { desc = "ACP: attach selection to the chat" })
+  end
+  if keymaps.diagnostic then
+    vim.keymap.set("n", keymaps.diagnostic, function()
+      M.add_diagnostic()
+    end, { desc = "ACP: attach diagnostic to the chat" })
+  end
 end
 
 local function ensure_setup()
@@ -227,39 +237,39 @@ local function create_thread(name, ws, agent)
   workspace().open(thread)
 end
 
----Create a new thread; prompts for name, agent, and worktree choice.
+---Create a new thread; prompts for name, agent, and workspace.
 ---@param name string|nil
-function M.new(name)
+---@param opts {workspace: false|table|nil}|nil preset workspace (false =
+---main checkout, worktree table = that worktree); nil asks via the picker
+function M.new(name, opts)
   ensure_setup()
 
   local function pick_workspace(n, agent)
     local root = registry().root
+    local preset = opts and opts.workspace
+    if preset ~= nil then
+      create_thread(n, preset and { adopt = preset } or false, agent)
+      return
+    end
     if not require("acp.util").git_root(root) then
       create_thread(n, false, agent)
       return
     end
-    -- Existing worktrees not already claimed by a live thread are offered
-    -- for adoption alongside the create options.
-    local claimed = {}
-    for _, t in ipairs(registry().threads) do
-      if t.worktree and t.worktree.path then
-        claimed[t.worktree.path] = true
-      end
+    -- Every workspace on offer: the main checkout, each existing worktree,
+    -- and creating a fresh one.
+    local worktrees = require("acp.core.worktree").list(root)
+    local items = { vim.fs.basename(root) .. " (main checkout)" }
+    for _, wt in ipairs(worktrees) do
+      table.insert(items, ("%s (%s)"):format(wt.name, wt.branch))
     end
-    local free = vim.tbl_filter(function(wt)
-      return not claimed[wt.path]
-    end, require("acp.core.worktree").list(root))
-    local items = { "Current checkout", "New worktree (isolated branch)" }
-    for _, wt in ipairs(free) do
-      table.insert(items, ("Worktree %s (%s)"):format(wt.name, wt.branch))
-    end
+    table.insert(items, "new worktree…")
     vim.ui.select(items, { prompt = "Workspace for '" .. n .. "':" }, function(choice, idx)
       if not choice then
         return
       end
       if idx == 1 then
         create_thread(n, false, agent)
-      elseif idx == 2 then
+      elseif idx == #items then
         -- The worktree gets its own name (dir + branch), defaulting to the
         -- thread's slug.
         local util = require("acp.util")
@@ -270,7 +280,7 @@ function M.new(name)
           create_thread(n, { create = util.slugify(wtname) }, agent)
         end)
       else
-        create_thread(n, { adopt = free[idx - 2] }, agent)
+        create_thread(n, { adopt = worktrees[idx - 1] }, agent)
       end
     end)
   end
@@ -392,6 +402,43 @@ local function current_or_last_thread()
   end
   workspace().open(thread)
   return thread
+end
+
+---Append `text` to the current (or last active) thread's input and focus it.
+---@param text string
+local function attach_to_input(text)
+  local thread = current_or_last_thread()
+  if not thread then
+    return
+  end
+  if not workspace().find_ui_win(thread.tabpage, "input") then
+    workspace().build_chat_column(thread)
+  end
+  require("acp.ui.input").append(thread, text)
+end
+
+---Send the current visual selection to the chat input as a context chip.
+function M.add_selection()
+  ensure_setup()
+  local chip = require("acp.context").selection_chip()
+  if not chip then
+    vim.notify("acp: no file selection to attach", vim.log.levels.INFO)
+    return
+  end
+  -- Leave visual mode before switching to the input window.
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "nx", false)
+  attach_to_input(chip)
+end
+
+---Send the diagnostics on the current line to the chat input.
+function M.add_diagnostic()
+  ensure_setup()
+  local text = require("acp.context").diagnostic_chip()
+  if not text then
+    vim.notify("acp: no diagnostic on this line", vim.log.levels.INFO)
+    return
+  end
+  attach_to_input(text)
 end
 
 ---Focus the chat input of the current (or last active) thread, building the
