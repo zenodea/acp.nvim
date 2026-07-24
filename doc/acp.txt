@@ -77,7 +77,8 @@ Or directly: >lua
 
                                                                      *:AcpNew*
 :AcpNew [name]  Create a thread. Prompts for the agent and the workspace:
-                the current checkout, a fresh git worktree, or one of the
+                the current checkout, a fresh git worktree (you pick its
+                name; dir and branch derive from it), or one of the
                 existing worktrees not already claimed by a thread. With
                 [name], skips the name prompt.
 

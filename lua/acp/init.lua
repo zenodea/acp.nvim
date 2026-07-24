@@ -200,24 +200,25 @@ local function unique_slug(name)
 end
 
 ---@param name string
----@param workspace boolean|{path: string, branch: string} false = current
----checkout, true = create a fresh worktree, table = adopt an existing one
+---@param ws false|{create: string}|{adopt: {path: string, branch: string}}
+---false = current checkout, create = new worktree with that name, adopt =
+---an existing worktree
 ---@param agent string|nil
-local function create_thread(name, workspace, agent)
+local function create_thread(name, ws, agent)
   local Thread = require("acp.core.thread")
   local root = registry().root
   local slug = unique_slug(name)
 
   local wt = nil
-  if workspace == true then
+  if type(ws) == "table" and ws.create then
     local err
-    wt, err = require("acp.core.worktree").create(root, slug)
+    wt, err = require("acp.core.worktree").create(root, ws.create)
     if not wt then
       vim.notify("acp: worktree creation failed: " .. (err or "?"), vim.log.levels.ERROR)
       return
     end
-  elseif type(workspace) == "table" then
-    wt = { path = workspace.path, branch = workspace.branch }
+  elseif type(ws) == "table" and ws.adopt then
+    wt = { path = ws.adopt.path, branch = ws.adopt.branch }
   end
 
   local thread = Thread.new({ name = name, cwd = wt and wt.path or root, worktree = wt, agent = agent })
@@ -256,7 +257,21 @@ function M.new(name)
       if not choice then
         return
       end
-      create_thread(n, idx == 2 or (idx > 2 and free[idx - 2]) or false, agent)
+      if idx == 1 then
+        create_thread(n, false, agent)
+      elseif idx == 2 then
+        -- The worktree gets its own name (dir + branch), defaulting to the
+        -- thread's slug.
+        local util = require("acp.util")
+        vim.ui.input({ prompt = "Worktree name: ", default = util.slugify(n) }, function(wtname)
+          if wtname == nil then
+            return -- cancelled
+          end
+          create_thread(n, { create = util.slugify(wtname) }, agent)
+        end)
+      else
+        create_thread(n, { adopt = free[idx - 2] }, agent)
+      end
     end)
   end
 
