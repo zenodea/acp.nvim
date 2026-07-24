@@ -17,10 +17,11 @@ jobs:
           args: --check lua plugin tests
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest]
         neovim: [v0.10.4, stable, nightly]
     steps:
       - uses: actions/checkout@v4
