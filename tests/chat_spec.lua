@@ -77,6 +77,29 @@ function T.intraline_diff_marks_changed_span_only()
   }, found)
 end
 
+function T.gd_jumps_to_the_tool_call_location()
+  n = n + 1
+  local thread = h.thread("chat-test-" .. n)
+  local tab = vim.api.nvim_get_current_tabpage()
+  thread.tabpage = tab
+  thread.tab_valid = function()
+    return true
+  end
+  local target = vim.fn.tempname()
+  vim.fn.writefile({ "one", "two", "three" }, target)
+  local buf = chat.ensure_buf(thread)
+  chat.append(thread, "tool", "Edit " .. target, "tc-loc", "edit")
+  chat.set_loc(thread, "tc-loc", { path = target, line = 2 })
+  vim.api.nvim_win_set_buf(0, buf)
+  vim.api.nvim_win_set_cursor(0, { 2, 0 })
+  chat.goto_at_cursor(thread)
+  local win = vim.api.nvim_get_current_win()
+  local shown = vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(win))
+  eq(vim.fn.resolve(target), vim.fn.resolve(shown), "code window shows the file")
+  eq(2, vim.api.nvim_win_get_cursor(win)[1], "cursor on the edited line")
+  vim.fn.delete(target)
+end
+
 function T.plan_active_step_is_highlighted()
   n = n + 1
   local thread = h.thread("chat-test-" .. n)
