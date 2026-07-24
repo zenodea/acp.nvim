@@ -27,7 +27,10 @@ local function reset()
   end
 end
 
-local specs = vim.fn.glob(root .. "/tests/*_spec.lua", true, true)
+-- Optional spec glob (relative to the repo root) as the first script arg:
+-- `nvim --headless -l tests/run.lua tests/e2e/*_spec.lua`. Default: unit specs.
+local pattern = (_G.arg and _G.arg[1]) or "tests/*_spec.lua"
+local specs = vim.fn.glob(root .. "/" .. pattern, true, true)
 table.sort(specs)
 local total, failed = 0, 0
 
