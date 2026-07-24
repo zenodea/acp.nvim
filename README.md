@@ -83,8 +83,9 @@ Chat input: `Enter` send, `Ctrl-j` newline, `Ctrl-c` interrupt, `Ctrl-p`/`Ctrl-n
 history, `gm` config, `gq` edit queued prompts, `gf` follow, `/` commands,
 `y`/`a`/`n` permissions.
 
-Chat transcript: `Enter` expand/collapse an entry, `gd` jump to the code a
-tool call touched.
+Chat transcript: `Enter` expand/collapse an entry, `Shift-Enter` open a tool
+call's full content in a float (`q` closes), `gd` jump to the code a tool
+call touched.
 
 Messages sent while the agent is working are queued; the input winbar shows
 the count. `gq` opens the queue as plain text in a floating buffer — edit,

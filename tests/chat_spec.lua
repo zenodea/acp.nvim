@@ -110,6 +110,53 @@ function T.gd_jumps_to_the_tool_call_location()
   vim.fn.delete(target)
 end
 
+function T.detail_float_shows_untruncated_tool_content()
+  n = n + 1
+  local thread = h.thread("chat-test-" .. n)
+  local buf = chat.ensure_buf(thread)
+  local big = {}
+  for i = 1, 60 do
+    big[i] = "line " .. i
+  end
+  -- 60 added lines: far beyond diff_max_lines (24), so the chat shows a
+  -- truncated diff but the detail float must show everything.
+  thread.session = {
+    tool_calls = {
+      tc = {
+        title = "Write big.lua",
+        kind = "edit",
+        status = "completed",
+        content = { { type = "diff", oldText = "", newText = table.concat(big, "\n") } },
+      },
+    },
+  }
+  chat.append(thread, "tool", "Write big.lua", "tc", "edit")
+  vim.api.nvim_win_set_buf(0, buf)
+  vim.api.nvim_win_set_cursor(0, { 2, 0 })
+  chat.detail_at_cursor(thread)
+  eq("editor", vim.api.nvim_win_get_config(0).relative, "detail opens in a float")
+  local shown = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  eq("Write big.lua · completed", shown[1])
+  local all = table.concat(shown, "\n")
+  eq(true, all:find("+ line 60", 1, true) ~= nil, "last diff line present")
+  eq(true, all:find("more lines", 1, true) == nil, "no truncation marker")
+  vim.cmd("normal q")
+  eq("", vim.api.nvim_win_get_config(0).relative, "q closes the float")
+end
+
+function T.detail_float_falls_back_to_entry_text()
+  n = n + 1
+  local thread = h.thread("chat-test-" .. n)
+  local buf = chat.ensure_buf(thread)
+  chat.append(thread, "tool", "Old call\n+ persisted line", "gone", "edit")
+  vim.api.nvim_win_set_buf(0, buf)
+  vim.api.nvim_win_set_cursor(0, { 2, 0 })
+  chat.detail_at_cursor(thread) -- no session: renders the persisted text
+  local all = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n")
+  eq(true, all:find("persisted line", 1, true) ~= nil)
+  vim.cmd("normal q")
+end
+
 function T.plan_active_step_is_highlighted()
   n = n + 1
   local thread = h.thread("chat-test-" .. n)
