@@ -981,8 +981,10 @@ function Session:on_notification(method, params)
       kind = u.kind,
       status = u.status or "pending",
       content = u.content,
+      locations = u.locations,
     }
     chat().append(self.thread, "tool", events.tool_text(self.tool_calls[id]), id, u.kind)
+    chat().set_loc(self.thread, id, u.locations and u.locations[1])
     self:maybe_follow(u.locations)
   elseif kind == "tool_call_update" then
     local id = u.toolCallId
@@ -998,6 +1000,7 @@ function Session:on_notification(method, params)
       if not chat().update_by_id(self.thread, id, text) then
         chat().append(self.thread, "tool", text, id, call.kind)
       end
+      chat().set_loc(self.thread, id, u.locations and u.locations[1])
       self:maybe_follow(u.locations)
     end
   elseif kind == "plan" then

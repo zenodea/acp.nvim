@@ -100,6 +100,7 @@ end
 ---@param thread Thread
 ---@param path string
 ---@param line integer|nil
+---@return integer|nil win the code window revealed into
 function M.reveal(thread, path, line)
   if not thread:tab_valid() or not path or vim.fn.filereadable(path) ~= 1 then
     return
@@ -121,6 +122,7 @@ function M.reveal(thread, path, line)
   if line then
     pcall(vim.api.nvim_win_set_cursor, win, { line, 0 })
   end
+  return win
 end
 
 ---Refresh the chat winbar: "name · agent [mode]".

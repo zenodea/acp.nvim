@@ -117,6 +117,8 @@ Chat transcript:
   <CR>          Expand or collapse the entry under the cursor
   i             Focus the message input
   <C-c>         Interrupt the agent
+  gd            Jump to the code location of the tool call under the
+                cursor (agents report the file/line they touched)
   gm gq gf      As in the input window
 
 The transcript cursor only rests on content lines; blank separator lines

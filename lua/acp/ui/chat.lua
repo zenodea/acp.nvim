@@ -370,6 +370,9 @@ function M.ensure_buf(thread)
   map("<CR>", function()
     M.toggle_at_cursor(thread)
   end, "Expand/collapse entry")
+  map("gd", function()
+    M.goto_at_cursor(thread)
+  end, "Go to the entry's code location")
 
   vim.api.nvim_create_autocmd("CursorMoved", {
     buffer = buf,
@@ -402,17 +405,57 @@ function M.ensure_buf(thread)
   return buf
 end
 
+---Transcript index of the entry under the cursor (chat window).
+---@param thread Thread
+---@return integer|nil
+local function entry_at_cursor(thread)
+  local lnum = vim.api.nvim_win_get_cursor(0)[1] - 1
+  for index, range in ipairs(st(thread).ranges) do
+    if lnum >= range.start and lnum < range.start + range.count then
+      return index
+    end
+  end
+end
+
 ---Toggle collapse of the entry under the cursor (chat window).
 ---@param thread Thread
 function M.toggle_at_cursor(thread)
-  local lnum = vim.api.nvim_win_get_cursor(0)[1] - 1
-  local s = st(thread)
-  for index, range in ipairs(s.ranges) do
-    if lnum >= range.start and lnum < range.start + range.count then
-      M.toggle_entry(thread, index)
-      pcall(vim.api.nvim_win_set_cursor, 0, { s.ranges[index].start + 2, 0 })
-      return
-    end
+  local index = entry_at_cursor(thread)
+  if index then
+    M.toggle_entry(thread, index)
+    pcall(vim.api.nvim_win_set_cursor, 0, { st(thread).ranges[index].start + 2, 0 })
+  end
+end
+
+---Jump to the code location of the tool call under the cursor (gd).
+---@param thread Thread
+function M.goto_at_cursor(thread)
+  local index = entry_at_cursor(thread)
+  local entry = index and thread.transcript[index]
+  local loc = entry and entry.loc
+  if not loc then
+    vim.notify("acp: no code location on this entry", vim.log.levels.INFO)
+    return
+  end
+  local win = require("acp.ui.workspace").reveal(thread, loc.path, loc.line)
+  if win then
+    vim.api.nvim_set_current_win(win)
+  end
+end
+
+---Record the code location of the entry registered under `id`, so gd can
+---jump to it (persisted with the transcript).
+---@param thread Thread
+---@param id string
+---@param loc {path: string, line: integer|nil}|nil
+function M.set_loc(thread, id, loc)
+  if not loc or not loc.path then
+    return
+  end
+  local index = st(thread).by_id[id]
+  local entry = index and thread.transcript[index]
+  if entry then
+    entry.loc = { path = loc.path, line = loc.line }
   end
 end
 
