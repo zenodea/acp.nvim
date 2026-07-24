@@ -52,6 +52,33 @@ function M.create(root, slug)
   return { path = path, branch = branch }, nil
 end
 
+---Plugin-managed worktrees found under the configured worktrees dir.
+---@param root string repo root
+---@return {path: string, branch: string, name: string}[]
+function M.list(root)
+  local cfg = require("acp.config").options.worktrees
+  local base = root .. "/" .. cfg.dir
+  local out = {}
+  if vim.fn.isdirectory(base) ~= 1 then
+    return out
+  end
+  for name, kind in vim.fs.dir(base) do
+    if kind == "directory" and vim.fn.filereadable(base .. "/" .. name .. "/.git") == 1 then
+      -- A worktree root has a .git *file*; a stray dir (where git would
+      -- resolve to the parent repo) or a nested repo does not.
+      local path = base .. "/" .. name
+      local ok, branch = util.system({ "git", "-C", path, "rev-parse", "--abbrev-ref", "HEAD" })
+      if ok then
+        table.insert(out, { path = path, branch = vim.trim(branch), name = name })
+      end
+    end
+  end
+  table.sort(out, function(a, b)
+    return a.name < b.name
+  end)
+  return out
+end
+
 ---@param wt {path: string, branch: string}
 ---@return boolean
 function M.is_dirty(wt)

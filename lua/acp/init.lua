@@ -200,21 +200,24 @@ local function unique_slug(name)
 end
 
 ---@param name string
----@param use_worktree boolean
+---@param workspace boolean|{path: string, branch: string} false = current
+---checkout, true = create a fresh worktree, table = adopt an existing one
 ---@param agent string|nil
-local function create_thread(name, use_worktree, agent)
+local function create_thread(name, workspace, agent)
   local Thread = require("acp.core.thread")
   local root = registry().root
   local slug = unique_slug(name)
 
   local wt = nil
-  if use_worktree then
+  if workspace == true then
     local err
     wt, err = require("acp.core.worktree").create(root, slug)
     if not wt then
       vim.notify("acp: worktree creation failed: " .. (err or "?"), vim.log.levels.ERROR)
       return
     end
+  elseif type(workspace) == "table" then
+    wt = { path = workspace.path, branch = workspace.branch }
   end
 
   local thread = Thread.new({ name = name, cwd = wt and wt.path or root, worktree = wt, agent = agent })
@@ -229,20 +232,32 @@ function M.new(name)
   ensure_setup()
 
   local function pick_workspace(n, agent)
-    if require("acp.util").git_root(registry().root) then
-      vim.ui.select(
-        { "Current checkout", "New worktree (isolated branch)" },
-        { prompt = "Workspace for '" .. n .. "':" },
-        function(choice, idx)
-          if not choice then
-            return
-          end
-          create_thread(n, idx == 2, agent)
-        end
-      )
-    else
+    local root = registry().root
+    if not require("acp.util").git_root(root) then
       create_thread(n, false, agent)
+      return
     end
+    -- Existing worktrees not already claimed by a live thread are offered
+    -- for adoption alongside the create options.
+    local claimed = {}
+    for _, t in ipairs(registry().threads) do
+      if t.worktree and t.worktree.path then
+        claimed[t.worktree.path] = true
+      end
+    end
+    local free = vim.tbl_filter(function(wt)
+      return not claimed[wt.path]
+    end, require("acp.core.worktree").list(root))
+    local items = { "Current checkout", "New worktree (isolated branch)" }
+    for _, wt in ipairs(free) do
+      table.insert(items, ("Worktree %s (%s)"):format(wt.name, wt.branch))
+    end
+    vim.ui.select(items, { prompt = "Workspace for '" .. n .. "':" }, function(choice, idx)
+      if not choice then
+        return
+      end
+      create_thread(n, idx == 2 or (idx > 2 and free[idx - 2]) or false, agent)
+    end)
   end
 
   local function pick_agent(n)

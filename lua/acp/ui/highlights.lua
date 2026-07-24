@@ -5,6 +5,7 @@ function M.setup()
     AcpSidebarTitle = "Title",
     AcpSidebarHint = "Comment",
     AcpSidebarBranch = "Comment",
+    AcpSidebarGroup = "Directory",
     AcpStatusWorking = "DiagnosticWarn",
     AcpStatusAttention = "DiagnosticError",
     AcpStatusIdle = "DiagnosticOk",

@@ -130,12 +130,77 @@ function M.ensure_buf()
   return buf
 end
 
+---Spinner state for threads in the "working" status.
+local frame = 1
+local spin_timer = nil
+
+local function stop_spin()
+  if spin_timer then
+    spin_timer:stop()
+    spin_timer:close()
+    spin_timer = nil
+  end
+end
+
+local function start_spin()
+  if spin_timer then
+    return
+  end
+  local uv = vim.uv or vim.loop
+  spin_timer = uv.new_timer()
+  if not spin_timer then
+    return
+  end
+  spin_timer:start(
+    120,
+    120,
+    vim.schedule_wrap(function()
+      frame = (frame % #require("acp.util").spinner) + 1
+      M.render()
+    end)
+  )
+end
+
+---Threads grouped by workspace: the main checkout first, then one group
+---per worktree (named after its directory), in name order.
+---@param registry table
+---@return {title: string, threads: table[]}[]
+local function grouped(registry)
+  local main = {
+    title = registry.root and vim.fs.basename(registry.root) or "checkout",
+    threads = {},
+  }
+  local groups, index = {}, {}
+  for _, t in ipairs(registry.threads) do
+    if t.worktree then
+      local key = t.worktree.path or t.worktree.branch
+      local g = index[key]
+      if not g then
+        g = { title = t.worktree.path and vim.fs.basename(t.worktree.path) or t.worktree.branch, threads = {} }
+        index[key] = g
+        table.insert(groups, g)
+      end
+      table.insert(g.threads, t)
+    else
+      table.insert(main.threads, t)
+    end
+  end
+  table.sort(groups, function(a, b)
+    return a.title < b.title
+  end)
+  if #main.threads > 0 then
+    table.insert(groups, 1, main)
+  end
+  return groups
+end
+
 function M.render()
   local buf = M.ensure_buf()
   local registry = require("acp.core.registry")
   local options = require("acp.config").options
   local cfg = options.ui
   local hls = require("acp.ui.highlights")
+  local spinner = require("acp.util").spinner
 
   local lines = { " ACP", "" }
   local marks = { { 0, "AcpSidebarTitle" } }
@@ -148,33 +213,47 @@ function M.render()
     table.insert(marks, { #lines - 1, "AcpSidebarHint" })
   end
 
-  for _, t in ipairs(registry.threads) do
-    local icon = cfg.icons[t.status] or "·"
-    local agent_def = options.agents[t.agent or options.default_agent]
-    local agent_icon = agent_def and agent_def.icon
-    -- Double space: several agent glyphs render double-width, which visually
-    -- swallows a single space before the name.
-    local label = agent_icon and (agent_icon .. "  " .. t.name) or t.name
-    table.insert(lines, string.format(" %s %s", icon, label))
-    line_map[#lines] = t.id
-    table.insert(name_lines, #lines)
-    name_set[#lines] = true
-    table.insert(marks, { #lines - 1, hls.status_group(t.status), #icon + 2 })
-    if t.worktree then
-      table.insert(lines, "     " .. t.worktree.branch)
+  local working = false
+  for _, group in ipairs(grouped(registry)) do
+    table.insert(lines, " " .. group.title)
+    table.insert(marks, { #lines - 1, "AcpSidebarGroup" })
+    for _, t in ipairs(group.threads) do
+      local icon = cfg.icons[t.status] or "·"
+      if t.status == "working" then
+        icon = spinner[frame]
+        working = true
+      end
+      local agent_def = options.agents[t.agent or options.default_agent]
+      local agent_icon = agent_def and agent_def.icon
+      -- Double space: several agent glyphs render double-width, which
+      -- visually swallows a single space before the name.
+      local label = agent_icon and (agent_icon .. "  " .. t.name) or t.name
+      table.insert(lines, string.format("   %s %s", icon, label))
       line_map[#lines] = t.id
-      table.insert(marks, { #lines - 1, "AcpSidebarBranch" })
+      table.insert(name_lines, #lines)
+      name_set[#lines] = true
+      table.insert(marks, { #lines - 1, hls.status_group(t.status), #icon + 4 })
+      if t.status_detail and (t.status == "attention" or t.status == "error") then
+        table.insert(lines, "       " .. t.status_detail)
+        line_map[#lines] = t.id
+        table.insert(marks, { #lines - 1, "AcpSidebarHint" })
+      end
     end
-    if t.status_detail and (t.status == "attention" or t.status == "error") then
-      table.insert(lines, "     " .. t.status_detail)
-      line_map[#lines] = t.id
-      table.insert(marks, { #lines - 1, "AcpSidebarHint" })
-    end
+    table.insert(lines, "")
   end
 
-  vim.list_extend(lines, { "", " n new · ⏎ open", " d delete · r rename" })
+  if lines[#lines] ~= "" then
+    table.insert(lines, "")
+  end
+  vim.list_extend(lines, { " n new · ⏎ open", " d delete · r rename" })
   table.insert(marks, { #lines - 2, "AcpSidebarHint" })
   table.insert(marks, { #lines - 1, "AcpSidebarHint" })
+
+  if working then
+    start_spin()
+  else
+    stop_spin()
+  end
 
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
