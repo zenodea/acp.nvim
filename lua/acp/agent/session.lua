@@ -579,7 +579,7 @@ function Session:edit_queue()
     vim.list_extend(lines, vim.split(text, "\n", { plain = true }))
   end
 
-  local name = "acp://queue/" .. self.thread.id
+  local name = "acp://queue/" .. self.thread.slug
   require("acp.util").wipe_named_buf(name)
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_buf_set_name(buf, name)
