@@ -3,9 +3,10 @@
 A Neovim plugin for running AI coding agents in parallel threads, similar to
 [Zed](https://zed.dev)'s agent panel. It is built on the
 [Agent Client Protocol](https://agentclientprotocol.com) (ACP), so it works
-with any ACP agent. [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
-and [Codex](https://github.com/zed-industries/codex-acp) are configured out of
-the box, others like Gemini CLI are one config entry away.
+with any ACP agent. [Claude Code](https://docs.anthropic.com/en/docs/claude-code),
+[Codex](https://github.com/zed-industries/codex-acp), and
+[Gemini CLI](https://github.com/google-gemini/gemini-cli) are configured out
+of the box; any other ACP agent is one config entry away.
 
 ## What it does
 
@@ -40,7 +41,7 @@ summary for your statusline.
 ## Requirements
 
 - Neovim 0.10+, Node.js, git (for worktrees)
-- A logged-in Claude Code or Codex CLI
+- A logged-in Claude Code, Codex, or Gemini CLI
 
 ## Install
 
@@ -93,7 +94,7 @@ require("acp").setup({
   agents = {
     claude = { cmd = { "npx", "-y", "@agentclientprotocol/claude-agent-acp" }, icon = "✳" },
     codex  = { cmd = { "npx", "-y", "@agentclientprotocol/codex-acp" }, icon = "⬡" },
-    -- gemini = { cmd = { "gemini", "--experimental-acp" }, icon = "◆" },
+    gemini = { cmd = { "npx", "-y", "@google/gemini-cli", "--experimental-acp" }, icon = "◆" },
     -- entries may also set env = { KEY = "value" }
   },
   default_agent = "claude",
