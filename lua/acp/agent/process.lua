@@ -65,17 +65,13 @@ end
 
 ---@param job integer
 function M.kill(job)
-  pcall(vim.fn.jobstop, job)
+  vim.fn.jobstop(job)
 end
 
 ---@param job integer|nil
 ---@return boolean
 function M.alive(job)
-  if not job then
-    return false
-  end
-  local ok, res = pcall(vim.fn.jobwait, { job }, 0)
-  return ok and res[1] == -1
+  return job ~= nil and vim.fn.jobwait({ job }, 0)[1] == -1
 end
 
 return M

@@ -122,7 +122,7 @@ function M.kill(id)
   if not term then
     return false
   end
-  pcall(vim.fn.jobstop, term.job)
+  vim.fn.jobstop(term.job)
   return true
 end
 
@@ -133,7 +133,7 @@ function M.release(id)
   if not term then
     return false
   end
-  pcall(vim.fn.jobstop, term.job)
+  vim.fn.jobstop(term.job)
   terminals[id] = nil
   return true
 end

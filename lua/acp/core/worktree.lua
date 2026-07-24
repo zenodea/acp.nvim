@@ -25,13 +25,21 @@ local function ensure_excluded(root, dir)
   end
 end
 
+---Path a worktree for `slug` lives at (single source of the dir layout).
+---@param root string repo root
+---@param slug string
+---@return string
+function M.path_for(root, slug)
+  return root .. "/" .. require("acp.config").options.worktrees.dir .. "/" .. slug
+end
+
 ---Create a worktree + branch for a thread slug.
 ---@param root string repo root
 ---@param slug string
 ---@return {path: string, branch: string}|nil worktree, string|nil err
 function M.create(root, slug)
   local cfg = require("acp.config").options.worktrees
-  local path = root .. "/" .. cfg.dir .. "/" .. slug
+  local path = M.path_for(root, slug)
   local branch = cfg.branch_prefix .. slug
 
   if vim.fn.isdirectory(path) == 1 then
@@ -53,26 +61,37 @@ function M.create(root, slug)
 end
 
 ---Plugin-managed worktrees found under the configured worktrees dir.
+---One `git worktree list` call instead of a git invocation per directory.
 ---@param root string repo root
 ---@return {path: string, branch: string, name: string}[]
 function M.list(root)
   local cfg = require("acp.config").options.worktrees
-  local base = root .. "/" .. cfg.dir
+  -- git prints symlink-resolved paths (/private/var vs /var on macOS):
+  -- compare resolved forms.
+  local base = vim.fn.resolve(root) .. "/" .. cfg.dir .. "/"
   local out = {}
-  if vim.fn.isdirectory(base) ~= 1 then
+  local ok, porcelain = util.system({ "git", "-C", root, "worktree", "list", "--porcelain" })
+  if not ok then
     return out
   end
-  for name, kind in vim.fs.dir(base) do
-    if kind == "directory" and vim.fn.filereadable(base .. "/" .. name .. "/.git") == 1 then
-      -- A worktree root has a .git *file*; a stray dir (where git would
-      -- resolve to the parent repo) or a nested repo does not.
-      local path = base .. "/" .. name
-      local ok, branch = util.system({ "git", "-C", path, "rev-parse", "--abbrev-ref", "HEAD" })
-      if ok then
-        table.insert(out, { path = path, branch = vim.trim(branch), name = name })
-      end
+  local path, branch
+  local function flush()
+    if path and vim.fn.resolve(path):sub(1, #base) == base and branch then
+      -- Emit the canonical root-based path (git's is symlink-resolved).
+      local name = vim.fs.basename(path)
+      table.insert(out, { path = M.path_for(root, name), branch = branch, name = name })
+    end
+    path, branch = nil, nil
+  end
+  for _, line in ipairs(util.lines(porcelain)) do
+    if line:match("^worktree ") then
+      flush()
+      path = line:sub(#"worktree " + 1)
+    elseif line:match("^branch ") then
+      branch = line:sub(#"branch " + 1):gsub("^refs/heads/", "")
     end
   end
+  flush()
   table.sort(out, function(a, b)
     return a.name < b.name
   end)

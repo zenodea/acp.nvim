@@ -4,11 +4,11 @@
 ---embedded resource when the agent supports it, else as a fenced code block.
 local M = {}
 
----Lua pattern matching a ranged chip token like "(file.txt 1-3)".
-M.pattern = "%([^%s()]+ %d+%-%d+%)"
----Pattern for whole-file chips like "(file.txt)". Only registered tokens
----expand, so ordinary parenthesised prose passes through untouched.
-M.file_pattern = "%([^%s()]+%)"
+---Ranged chip token like "(file.txt 1-3)". Whole-file chips look like
+---"(file.txt)"; only registered tokens expand, so ordinary parenthesised
+---prose passes through untouched.
+local ranged_pattern = "%([^%s()]+ %d+%-%d+%)"
+local file_pattern = "%([^%s()]+%)"
 
 ---@type {path: string, s: integer, e: integer, text: string}|nil last linewise yank
 local last_yank = nil
@@ -135,13 +135,15 @@ end
 ---@param from integer
 ---@return integer|nil s, integer|nil e
 local function next_token(text, from)
-  local s1, e1 = text:find(M.pattern, from)
-  local s2, e2 = text:find(M.file_pattern, from)
+  local s1, e1 = text:find(ranged_pattern, from)
+  local s2, e2 = text:find(file_pattern, from)
   if s1 and (not s2 or s1 <= s2) then
     return s1, e1
   end
   return s2, e2
 end
+
+local files_cache = { cwd = nil, at = 0, list = {} }
 
 ---Project files matching `base` (for the @ completion), relative to `cwd`.
 ---Uses git when available (respects .gitignore), else a bounded glob.
@@ -150,17 +152,22 @@ end
 ---@param base string
 ---@return string[]
 function M.files(cwd, base)
-  local util = require("acp.util")
-  local ok, out = util.system({ "git", "-C", cwd, "ls-files", "-co", "--exclude-standard" })
-  local candidates
-  if ok then
-    candidates = vim.split(out, "\n", { plain = true, trimempty = true })
-  else
-    candidates = vim.fn.globpath(cwd, "**", false, true)
-    for i, p in ipairs(candidates) do
-      candidates[i] = p:sub(#cwd + 2)
+  -- The @ completion refires per keystroke; scan once and refilter.
+  local now = (vim.uv or vim.loop).now()
+  if files_cache.cwd ~= cwd or (now - files_cache.at) > 5000 then
+    local ok, out = require("acp.util").system({ "git", "-C", cwd, "ls-files", "-co", "--exclude-standard" })
+    local candidates
+    if ok then
+      candidates = vim.split(out, "\n", { plain = true, trimempty = true })
+    else
+      candidates = vim.fn.globpath(cwd, "**", false, true)
+      for i, p in ipairs(candidates) do
+        candidates[i] = p:sub(#cwd + 2)
+      end
     end
+    files_cache = { cwd = cwd, at = now, list = candidates }
   end
+  local candidates = files_cache.list
   local matches = {}
   base = base:lower()
   for _, rel in ipairs(candidates) do

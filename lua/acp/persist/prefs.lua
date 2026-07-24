@@ -16,31 +16,13 @@ local function load()
   if cache then
     return cache
   end
-  cache = { favourite_models = {} }
-  local f = io.open(prefs_file(), "r")
-  if f then
-    local content = f:read("*a")
-    f:close()
-    local ok, decoded = pcall(vim.json.decode, content, { luanil = { object = true, array = true } })
-    if ok and type(decoded) == "table" then
-      decoded.favourite_models = decoded.favourite_models or {}
-      cache = decoded
-    end
-  end
+  cache = require("acp.util").read_json(prefs_file()) or {}
+  cache.favourite_models = cache.favourite_models or {}
   return cache
 end
 
 local function save()
-  local ok, encoded = pcall(vim.json.encode, cache)
-  if not ok then
-    return
-  end
-  vim.fn.mkdir(vim.fn.stdpath("data") .. "/acp", "p")
-  local f = io.open(prefs_file(), "w")
-  if f then
-    f:write(encoded)
-    f:close()
-  end
+  require("acp.util").write_json(prefs_file(), cache)
 end
 
 ---Favourite value of a config option (keyed per agent), e.g. the model id.

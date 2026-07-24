@@ -100,6 +100,17 @@ local function build_tab(thread)
   vim.api.nvim_set_current_win(code_win)
 end
 
+---First non-plugin window of a tab (the code area).
+---@param tabpage integer
+---@return integer|nil
+local function find_code_win(tabpage)
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
+    if not vim.w[win].acp_ui then
+      return win
+    end
+  end
+end
+
 ---Show a file (and line) in the thread's code window without stealing focus.
 ---@param thread Thread
 ---@param path string
@@ -109,13 +120,7 @@ function M.reveal(thread, path, line)
   if not thread:tab_valid() or not path or vim.fn.filereadable(path) ~= 1 then
     return
   end
-  local win
-  for _, w in ipairs(vim.api.nvim_tabpage_list_wins(thread.tabpage)) do
-    if not vim.w[w].acp_ui then
-      win = w
-      break
-    end
-  end
+  local win = find_code_win(thread.tabpage)
   if not win then
     return
   end
@@ -139,7 +144,7 @@ function M.update_winbar(thread)
   if not win then
     return
   end
-  local agent = thread.agent or require("acp.config").options.default_agent
+  local agent = thread:agent_name()
   local text = " " .. thread.name .. (agent and (" · " .. agent) or "")
   local session = thread.session
   local badges = {}
@@ -147,15 +152,7 @@ function M.update_winbar(thread)
     -- Prefer config options (mode/model categories); fall back to legacy modes.
     for _, opt in ipairs(session.config_options or {}) do
       if opt.category == "mode" or opt.category == "model" then
-        local label = tostring(opt.currentValue)
-        if opt.type == "select" then
-          for _, o in ipairs(opt.options or {}) do
-            if o.value == opt.currentValue then
-              label = o.name or o.value
-            end
-          end
-        end
-        table.insert(badges, label)
+        table.insert(badges, session:option_label(opt))
       end
     end
     if #badges == 0 and session.modes and session.modes.currentModeId then
@@ -203,17 +200,6 @@ end
 
 local find_ui_win = M.find_ui_win
 
----First non-plugin window of a tab (the code area).
----@param tabpage integer
----@return integer|nil
-local function find_code_win(tabpage)
-  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
-    if not vim.w[win].acp_ui then
-      return win
-    end
-  end
-end
-
 ---Open (or focus) a thread's workspace tab.
 ---@param thread Thread
 function M.open(thread)
@@ -243,13 +229,7 @@ function M.open(thread)
     require("acp.ui.input").focus(thread)
     return
   end
-  local win
-  if focus == "code" then
-    win = find_code_win(thread.tabpage)
-  else
-    win = find_ui_win(thread.tabpage, focus)
-  end
-  win = win or find_code_win(thread.tabpage)
+  local win = find_ui_win(thread.tabpage, focus) or find_code_win(thread.tabpage)
   if win then
     vim.api.nvim_set_current_win(win)
   end
@@ -306,7 +286,6 @@ function M.close(thread)
   end
   for _, t in ipairs(vim.api.nvim_list_tabpages()) do
     if t == tab then
-      local wins = vim.api.nvim_tabpage_list_wins(t)
       vim.api.nvim_set_current_tabpage(t)
       vim.cmd("tabclose")
       break

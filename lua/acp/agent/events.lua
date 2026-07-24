@@ -123,14 +123,36 @@ function M.tool_content_lines(content, max)
   return lines
 end
 
+---@param content table[]|nil
+---@return boolean
+local function has_terminal(content)
+  for _, item in ipairs(content or {}) do
+    if item.type == "terminal" then
+      return true
+    end
+  end
+  return false
+end
+
 ---One rendered text block for a tool call (first line = title + status).
+---Content lines are cached on the call (`_lines`) so status-only updates
+---don't re-diff the full file text; the session invalidates the cache when
+---an update carries new content. Terminal-embedding calls always re-render
+---(their output grows outside tool_call_update).
 ---@param call table merged tool_call / tool_call_update fields
 ---@return string
 function M.tool_text(call)
   local title = call.title or call.kind or "tool"
   local head = util.shorten(title, 70) .. (status_suffix[call.status or "pending"] or "")
+  local content_lines = call._lines
+  if not content_lines then
+    content_lines = M.tool_content_lines(call.content)
+    if not has_terminal(call.content) then
+      call._lines = content_lines
+    end
+  end
   local lines = { head }
-  vim.list_extend(lines, M.tool_content_lines(call.content))
+  vim.list_extend(lines, content_lines)
   return table.concat(lines, "\n")
 end
 

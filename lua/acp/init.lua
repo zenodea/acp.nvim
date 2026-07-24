@@ -194,15 +194,11 @@ end
 ---@param name string
 ---@return string
 local function unique_slug(name)
-  local util = require("acp.util")
-  local cfg = require("acp.config").options.worktrees
-  local base = util.slugify(name)
+  local worktree = require("acp.core.worktree")
+  local base = require("acp.util").slugify(name)
   local slug = base
   local n = 1
-  while
-    registry().find_by_slug(slug) ~= nil
-    or vim.fn.isdirectory(registry().root .. "/" .. cfg.dir .. "/" .. slug) == 1
-  do
+  while registry().find_by_slug(slug) ~= nil or vim.fn.isdirectory(worktree.path_for(registry().root, slug)) == 1 do
     n = n + 1
     slug = base .. "-" .. n
   end
@@ -348,14 +344,11 @@ function M.delete(thread)
       2
     )
     if choice == 1 then
-      local force = false
-      if wt_mod.is_dirty(thread.worktree) then
-        force = vim.fn.confirm("Worktree has uncommitted changes. Remove anyway?", "&Yes\n&No", 2) == 1
-        if not force then
-          vim.notify("acp: kept worktree " .. thread.worktree.path, vim.log.levels.INFO)
-        end
-      end
-      if force or not wt_mod.is_dirty(thread.worktree) then
+      local dirty = wt_mod.is_dirty(thread.worktree)
+      local force = dirty and vim.fn.confirm("Worktree has uncommitted changes. Remove anyway?", "&Yes\n&No", 2) == 1
+      if dirty and not force then
+        vim.notify("acp: kept worktree " .. thread.worktree.path, vim.log.levels.INFO)
+      else
         local ok, err = wt_mod.remove(registry().root, thread.worktree, force)
         if not ok then
           vim.notify("acp: worktree removal failed: " .. (err or "?"), vim.log.levels.ERROR)
@@ -365,6 +358,7 @@ function M.delete(thread)
   end
 
   require("acp.agent.session").stop(thread)
+  require("acp.ui.chat").forget(thread)
   registry().remove(thread)
   store().save()
 end

@@ -31,20 +31,13 @@ function M.save()
     last_active = registry.last_active,
     threads = threads,
   }
-  local ok, encoded = pcall(vim.json.encode, state)
-  if not ok then
-    return
-  end
-  vim.fn.mkdir(state_dir(), "p")
-  local f = io.open(state_file(), "w")
-  if f then
-    f:write(encoded)
-    f:close()
-  end
+  require("acp.util").write_json(state_file(), state)
   dirty = false
 end
 
----Debounced save; safe to call from event streams.
+---Debounced save; safe to call from event streams. The window is generous:
+---durability is covered by the forced save on VimLeavePre and on delete,
+---and each save re-encodes every thread transcript.
 function M.save_debounced()
   dirty = true
   if timer_armed then
@@ -56,7 +49,7 @@ function M.save_debounced()
     if dirty then
       M.save()
     end
-  end, 500)
+  end, 2500)
 end
 
 ---Load persisted threads into the registry (called once from setup).
@@ -64,14 +57,8 @@ function M.load()
   if not require("acp.config").options.persist.enabled then
     return
   end
-  local f = io.open(state_file(), "r")
-  if not f then
-    return
-  end
-  local content = f:read("*a")
-  f:close()
-  local ok, state = pcall(vim.json.decode, content, { luanil = { object = true, array = true } })
-  if not ok or type(state) ~= "table" or type(state.threads) ~= "table" then
+  local state = require("acp.util").read_json(state_file())
+  if not state or type(state.threads) ~= "table" then
     return
   end
   local registry = require("acp.core.registry")
