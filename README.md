@@ -30,7 +30,9 @@ failed. Background threads that need attention also fire a notification, and
 - [x] Permission prompts answered inline in the chat
 - [x] Agent reads and writes through your buffers, unsaved edits included
 - [x] Editor-provided terminals with live command output
-- [x] Context chips: pasted file yanks become `(file.txt 1-3)`
+- [x] Context chips: pasted file yanks become `(file.txt 1-3)`; `<leader>cs`
+      attaches a visual selection, `<leader>cd` a diagnostic, and `@` in the
+      input completes project files into whole-file chips
 - [x] Mode and model picker (`gm`), slash command picker (`/`)
 - [x] Favourite model per agent: the last model you pick becomes the default
 - [x] Sessions autostart when a thread is opened (spinner while booting)
@@ -63,16 +65,19 @@ Run `:checkhealth acp` after installing.
 | Command            | Action                                                |
 | ------------------ | ----------------------------------------------------- |
 | `:Acp`             | Open the last active thread, or create one if none exist |
-| `:AcpNew [name]`   | Create a thread: pick the agent, then the workspace (checkout, new worktree, or an existing free worktree) |
+| `:AcpNew [name]`   | Create a thread: pick the agent, then the workspace (main checkout, any worktree, or a new named worktree) |
 | `:AcpToggleChat`   | Show or hide the chat column                          |
 | `:AcpInterrupt`    | Interrupt the current thread's turn                   |
 | `:checkhealth acp` | Verify agents, git, and Neovim setup                  |
 
 ## Keymaps
 
-Global: `<leader>cc` focus chat, `<leader>ct` focus sidebar.
+Global: `<leader>cc` focus chat, `<leader>ct` focus sidebar, `<leader>cs`
+(visual) attach the selection to the chat as a context chip, `<leader>cd`
+attach the diagnostic under the cursor.
 
-Sidebar: `Enter` open, `n` new, `d` delete, `r` rename.
+Sidebar: `Enter` open, `n` new (inside a workspace section, the new thread
+uses that workspace), `d` delete, `r` rename.
 
 Chat input: `Enter` send, `Ctrl-j` newline, `Ctrl-c` interrupt, `Ctrl-p`/`Ctrl-n`
 history, `gm` config, `gq` edit queued prompts, `gf` follow, `/` commands,
@@ -124,6 +129,8 @@ require("acp").setup({
   keymaps = {
     chat = "<leader>cc",
     threads = "<leader>ct",
+    selection = "<leader>cs", -- (visual) attach the selection as a chip
+    diagnostic = "<leader>cd", -- attach the diagnostic under the cursor
   },
   notify = true,
 })

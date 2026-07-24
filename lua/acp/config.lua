@@ -86,6 +86,8 @@ M.defaults = {
   keymaps = {
     chat = "<leader>cc", -- focus the chat of the current (or last) thread
     threads = "<leader>ct", -- focus the threads sidebar
+    selection = "<leader>cs", -- (visual) send the selection as a context chip
+    diagnostic = "<leader>cd", -- send the diagnostic under the cursor
   },
 
   -- vim.notify when a background thread needs attention / finishes.

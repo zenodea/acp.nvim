@@ -6,6 +6,9 @@ local ns = vim.api.nvim_create_namespace("acp-sidebar")
 M.buf = nil
 ---@type table<integer, string> 1-based line -> thread id
 local line_map = {}
+---@type table<integer, false|table> 1-based line -> workspace of its group
+---(false = main checkout, worktree table otherwise); absent = no group
+local group_map = {}
 ---@type integer[] sorted 1-based lines holding a thread *name* (cursor targets)
 local name_lines = {}
 ---@type table<integer, boolean>
@@ -46,6 +49,13 @@ function M.snap()
   end
   pcall(vim.api.nvim_win_set_cursor, win, { target, 0 })
   last_pos[win] = target
+end
+
+---Workspace of the group under the cursor: false for the main checkout,
+---the worktree table for a worktree group, nil outside any group.
+---@return false|table|nil
+function M.workspace_at_cursor()
+  return group_map[vim.api.nvim_win_get_cursor(0)[1]]
 end
 
 ---Place the cursor of every sidebar window on `thread_id`'s name line.
@@ -105,7 +115,8 @@ function M.ensure_buf()
     end
   end, "Open thread")
   map("n", function()
-    api().new()
+    -- Creating from inside a group targets that group's workspace.
+    api().new(nil, { workspace = M.workspace_at_cursor() })
   end, "New thread")
   map("d", function()
     local t = thread_at_cursor()
@@ -168,6 +179,7 @@ end
 local function grouped(registry)
   local main = {
     title = registry.root and vim.fs.basename(registry.root) or "checkout",
+    ws = false, -- workspace spec for threads created from this group
     threads = {},
   }
   local groups, index = {}, {}
@@ -176,7 +188,11 @@ local function grouped(registry)
       local key = t.worktree.path or t.worktree.branch
       local g = index[key]
       if not g then
-        g = { title = t.worktree.path and vim.fs.basename(t.worktree.path) or t.worktree.branch, threads = {} }
+        g = {
+          title = t.worktree.path and vim.fs.basename(t.worktree.path) or t.worktree.branch,
+          ws = t.worktree,
+          threads = {},
+        }
         index[key] = g
         table.insert(groups, g)
       end
@@ -205,6 +221,7 @@ function M.render()
   local lines = { " ACP", "" }
   local marks = { { 0, "AcpSidebarTitle" } }
   line_map = {}
+  group_map = {}
   name_lines = {}
   name_set = {}
 
@@ -216,6 +233,7 @@ function M.render()
   local working = false
   for _, group in ipairs(grouped(registry)) do
     table.insert(lines, " " .. group.title)
+    group_map[#lines] = group.ws
     table.insert(marks, { #lines - 1, "AcpSidebarGroup" })
     for _, t in ipairs(group.threads) do
       local icon = cfg.icons[t.status] or "·"
@@ -230,12 +248,14 @@ function M.render()
       local label = agent_icon and (agent_icon .. "  " .. t.name) or t.name
       table.insert(lines, string.format("   %s %s", icon, label))
       line_map[#lines] = t.id
+      group_map[#lines] = group.ws
       table.insert(name_lines, #lines)
       name_set[#lines] = true
       table.insert(marks, { #lines - 1, hls.status_group(t.status), #icon + 4 })
       if t.status_detail and (t.status == "attention" or t.status == "error") then
         table.insert(lines, "       " .. t.status_detail)
         line_map[#lines] = t.id
+        group_map[#lines] = group.ws
         table.insert(marks, { #lines - 1, "AcpSidebarHint" })
       end
     end

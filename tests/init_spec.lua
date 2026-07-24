@@ -42,8 +42,8 @@ function T.new_worktree_thread_prompts_for_worktree_name()
     return { path = "/tmp/fake-wt/" .. slug, branch = "agents/" .. slug }
   end
   vim.ui.select = function(items, _, cb)
-    if items[1] == "Current checkout" then
-      cb(items[2], 2) -- "New worktree (isolated branch)"
+    if items[#items] == "new worktree…" then
+      cb(items[#items], #items) -- workspace picker: create a new worktree
     else
       cb(items[1], 1) -- first agent
     end
@@ -62,6 +62,31 @@ function T.new_worktree_thread_prompts_for_worktree_name()
   eq("my-fancy-tree", created_name, "worktree named from the prompt, slugified")
   local t = registry.threads[#registry.threads]
   eq("agents/my-fancy-tree", t.worktree.branch)
+  require("acp.ui.workspace").close(t)
+  vim.cmd("silent! tabonly!")
+  registry.remove(t)
+end
+
+function T.preset_workspace_skips_the_picker()
+  local cfg = require("acp.config")
+  local registry = require("acp.core.registry")
+  local old_autostart, old_select = cfg.options.autostart, vim.ui.select
+  cfg.options.autostart = false
+  vim.ui.select = function(items, opts, cb)
+    assert(not (opts.prompt or ""):find("Workspace"), "workspace picker must not appear")
+    cb(items[1], 1) -- agent picker only
+  end
+
+  local wt = { path = "/tmp/preset-wt", branch = "agents/preset" }
+  local ok, err = pcall(require("acp").new, "preset-test", { workspace = wt })
+
+  vim.ui.select = old_select
+  cfg.options.autostart = old_autostart
+  assert(ok, err)
+
+  local t = registry.threads[#registry.threads]
+  eq("agents/preset", t.worktree.branch, "preset worktree adopted")
+  eq("/tmp/preset-wt", t.cwd)
   require("acp.ui.workspace").close(t)
   vim.cmd("silent! tabonly!")
   registry.remove(t)

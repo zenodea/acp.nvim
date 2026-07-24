@@ -82,6 +82,19 @@ function T.snap_keeps_cursor_on_thread_names()
   eq(true, on_name, "on a thread name line (got " .. lnum .. ")")
 end
 
+function T.workspace_at_cursor_follows_groups()
+  sidebar.render()
+  vim.api.nvim_win_set_buf(0, sidebar.buf)
+  vim.api.nvim_win_set_cursor(0, { line_of("alpha"), 0 })
+  eq(false, sidebar.workspace_at_cursor(), "main-checkout thread -> false")
+  vim.api.nvim_win_set_cursor(0, { line_of("gamma"), 0 })
+  eq("/repo/.worktrees/feat-x", sidebar.workspace_at_cursor().path, "worktree thread -> its worktree")
+  vim.api.nvim_win_set_cursor(0, { line_of("feat-x"), 0 })
+  eq("feat/x", sidebar.workspace_at_cursor().branch, "group header -> the worktree")
+  vim.api.nvim_win_set_cursor(0, { 1, 0 })
+  eq(nil, sidebar.workspace_at_cursor(), "title line -> no group")
+end
+
 function T.render_lists_all_threads()
   registry.threads[4] = { id = "d", name = "delta", status = "attention" }
   sidebar.render()

@@ -77,10 +77,11 @@ Or directly: >lua
 
                                                                      *:AcpNew*
 :AcpNew [name]  Create a thread. Prompts for the agent and the workspace:
-                the current checkout, a fresh git worktree (you pick its
-                name; dir and branch derive from it), or one of the
-                existing worktrees not already claimed by a thread. With
-                [name], skips the name prompt.
+                the main checkout, any existing worktree, or a fresh git
+                worktree (you pick its name; dir and branch derive from
+                it). With [name], skips the name prompt. Pressing `n` in
+                the sidebar inside a workspace section skips the workspace
+                prompt and uses that section's workspace.
 
                                                               *:AcpToggleChat*
 :AcpToggleChat  Show or hide the chat column (chat + input windows) of the
@@ -96,11 +97,16 @@ Global (configurable via the `keymaps` option, set to `false` to disable):
 
   <leader>cc    Focus the chat input of the current (or last) thread
   <leader>ct    Focus the threads sidebar
+  <leader>cs    (visual) Attach the selection to the chat as a context
+                chip like `(file.lua 10-24)` — expanded at send time
+  <leader>cd    Attach the diagnostic(s) on the current line, with a chip
+                pointing at the offending line
 
 Sidebar:
 
   <CR>          Open the thread under the cursor
-  n             New thread
+  n             New thread; inside a workspace section, the thread is
+                created in that section's workspace
   d             Delete the thread under the cursor
   r             Rename the thread under the cursor
 
@@ -114,6 +120,7 @@ Chat input:
   gq            Edit the queued prompts, see |acp-queue|
   gf            Toggle follow mode (jump to where the agent works)
   /             Agent slash commands (at the start of the input)
+  @             Complete project files into whole-file context chips
   y a n         Answer a pending permission prompt (allow / always / deny)
 
 Chat transcript:
@@ -238,6 +245,8 @@ Defaults: >lua
     keymaps = {
       chat = "<leader>cc",
       threads = "<leader>ct",
+      selection = "<leader>cs",  -- (visual) attach selection as a chip
+      diagnostic = "<leader>cd", -- attach diagnostic under the cursor
     },
 
     -- vim.notify when a background thread needs attention / finishes.
