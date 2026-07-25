@@ -1,5 +1,15 @@
 local M = {}
 
+---Set a window's winbar from plain text. 'winbar' takes statusline syntax,
+---where `%` introduces an item: an unescaped one in a thread name, a model
+---label, or a percentage raises E539 and leaves the winbar unset. None of
+---this text is meant as syntax, so double every `%`.
+---@param win integer
+---@param text string
+local function set_winbar(win, text)
+  vim.wo[win].winbar = (text:gsub("%%", "%%%%"))
+end
+
 ---@param win integer
 ---@param role string
 local function mark(win, role)
@@ -147,7 +157,7 @@ function M.update_follow_winbar(thread)
   local on = thread:follow_enabled()
   for _, win in ipairs(vim.api.nvim_tabpage_list_wins(thread.tabpage)) do
     if vim.w[win].acp_follow then
-      vim.wo[win].winbar = on and (" ⟳ following " .. thread:agent_name()) or " ⟳ follow paused (gf)"
+      set_winbar(win, on and (" ⟳ following " .. thread:agent_name()) or " ⟳ follow paused (gf)")
     end
   end
 end
@@ -209,7 +219,7 @@ function M.reveal(thread, path, line)
   return win
 end
 
----Refresh the chat winbar: "name · agent [mode]  ▤ 2/5  ◇ 1".
+---Refresh the chat winbar: "name · agent [mode]  ▤ 2/5  ◇ 1  ◔ 21%".
 ---@param thread Thread
 function M.update_winbar(thread)
   if not thread:tab_valid() then
@@ -248,10 +258,14 @@ function M.update_winbar(thread)
   if subagents > 0 then
     text = text .. ("  ◇ %d"):format(subagents)
   end
+  local usage = require("acp.agent.events").usage_text(thread.usage)
+  if usage then
+    text = text .. "  " .. usage
+  end
   if session and session.starting then
     text = text .. "  " .. (session.spinner or "…") .. " starting"
   end
-  vim.wo[win].winbar = text
+  set_winbar(win, text)
 end
 
 ---Refresh the input winbar: send hints, plus the prompt queue when non-empty.
@@ -266,9 +280,9 @@ function M.update_input_winbar(thread)
   end
   local queue = (thread.session and thread.session.queue) or {}
   if #queue > 0 then
-    vim.wo[win].winbar = (" ⧗ %d queued · gq edit · C-c interrupt"):format(#queue)
+    set_winbar(win, (" ⧗ %d queued · gq edit · C-c interrupt"):format(#queue))
   else
-    vim.wo[win].winbar = " ⏎ send · C-j newline · C-c interrupt"
+    set_winbar(win, " ⏎ send · C-j newline · C-c interrupt")
   end
 end
 

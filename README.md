@@ -42,6 +42,8 @@ failed. Background threads that need attention also fire a notification, and
       the chat winbar
 - [x] Subagent panel (`gs`): what the agent delegated, with status and
       runtime; running count in the chat winbar
+- [x] Context counter in the chat winbar: `◔ 21%` of the model's window,
+      reported by the agent
 - [x] Follow mode: jump to where the agent is working (`gf`), pinned to the
       window you pick with `<leader>cf`
 - [x] Persistence: threads, layouts, and conversations survive restarts
@@ -106,6 +108,10 @@ Agents that plan their work send their steps as they go. They land in the
 transcript, but scroll away; `gp` opens the latest plan in a float (`○` not
 started, `◐` in progress, `✓` done, `q` closes), and the chat winbar carries
 the step count as `▤ 2/5` while a plan is live.
+
+The chat winbar carries a context counter — `◔ 21%` of the model's context
+window, straight from the agent — with the glyph filling up (`○ ◔ ◑ ◕ ●`) as
+the window does. Agents that don't report usage simply have no counter.
 
 With follow mode on, the code area jumps to whatever file and line the agent
 touches. `<leader>cf` marks the window you run it in as the target, so the

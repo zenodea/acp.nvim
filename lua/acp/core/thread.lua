@@ -26,6 +26,7 @@ local util = require("acp.util")
 ---@field tabpage integer|nil      -- transient
 ---@field session table|nil        -- transient agent session
 ---@field subagents table[]|nil    -- transient, see acp.ui.subagents
+---@field usage {used: integer, size: integer}|nil -- transient context usage
 ---@field chat_buf integer|nil     -- transient
 ---@field input_buf integer|nil    -- transient
 local Thread = {}
