@@ -565,6 +565,8 @@ function Session:on_turn_end(result, err)
   self.turn_headered = false
   self:cancel_pending_permission()
   chat().close_stream(self.thread)
+  -- A call the agent never marked finished is not still running either.
+  chat().stop_spinners(self.thread)
   local cfg = require("acp.config").options
 
   if err then
@@ -877,6 +879,7 @@ function Session:on_notification(method, params)
     }
     local tool_kind = self:track_subagent(id, self.tool_calls[id])
     chat().append(self.thread, "tool", events.tool_text(self.tool_calls[id]), id, tool_kind)
+    chat().set_status(self.thread, id, self.tool_calls[id].status)
     chat().set_loc(self.thread, id, u.locations and u.locations[1])
     self:maybe_follow(u.locations)
   elseif kind == "tool_call_update" then
@@ -897,6 +900,7 @@ function Session:on_notification(method, params)
       if not chat().update_by_id(self.thread, id, text) then
         chat().append(self.thread, "tool", text, id, tool_kind)
       end
+      chat().set_status(self.thread, id, call.status)
       chat().set_loc(self.thread, id, u.locations and u.locations[1])
       self:maybe_follow(u.locations)
     end
@@ -945,6 +949,7 @@ function Session:on_exit(code)
   local was_busy = self.busy
   self.busy = false
   self:cancel_pending_permission()
+  chat().stop_spinners(self.thread)
   self.tool_calls = {}
   if self.starting then
     self:fail_start({ message = "agent exited during startup (code " .. code .. ")" }, "agent exited")

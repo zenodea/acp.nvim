@@ -92,6 +92,17 @@ return {
     },
   },
 
+  -- A tool call left in flight for the whole turn, so the spinner next to it
+  -- can be observed without racing the agent.
+  slow_tool = {
+    turns = {
+      {
+        { tool_call = { toolCallId = "t1", title = "Run the suite", kind = "execute", status = "in_progress" } },
+        { wait_cancel = true },
+      },
+    },
+  },
+
   crash_mid_turn = {
     turns = {
       { { chunk = "about to die" }, { exit = 3 } },

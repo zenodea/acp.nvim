@@ -26,7 +26,8 @@ failed. Background threads that need attention also fire a notification, and
 
 - [x] One agent process per thread, different agents per thread
 - [x] Optional git worktree and branch per thread
-- [x] Streaming chat with live tool calls, diffs, and plans
+- [x] Streaming chat with live tool calls, diffs, and plans; unfinished tool
+      calls spin until they land
 - [x] Permission prompts answered inline in the chat
 - [x] Agent reads and writes through your buffers, unsaved edits included
 - [x] Editor-provided terminals with live command output

@@ -3,12 +3,10 @@ local util = require("acp.util")
 ---Rendering helpers for ACP `session/update` payloads.
 local M = {}
 
-local status_suffix = {
-  pending = " …",
-  in_progress = " …",
-  completed = "",
-  failed = " ✗",
-}
+---Unfinished calls are marked by the animated spinner the chat runs next to
+---their title (see acp.ui.chat.set_status), so only failure needs a mark
+---baked into the text itself.
+local status_suffix = { failed = " ✗" }
 
 ---Extract plain text from an ACP content block.
 ---@param content table|nil

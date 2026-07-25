@@ -39,7 +39,8 @@ main checkout first, then one section per worktree — and shows a status
 per thread: an animated spinner while working, `?` needs you, `✓` done,
 `✗` failed. Background threads that need attention also fire a
 notification (see |acp-options|), and `require("acp").statusline()` gives
-you a summary for your statusline.
+you a summary for your statusline. Inside the transcript, a tool call the
+agent has not finished yet carries that same spinner next to its title.
 
 Threads, layouts, and conversations survive restarts (|acp-options|
 `persist`).

@@ -176,6 +176,82 @@ function T.plan_active_step_is_highlighted()
   eq({ 3 }, active)
 end
 
+---Spinner glyphs currently drawn in `buf`, by 0-based line.
+---@param buf integer
+local function spinners(buf)
+  local ns = vim.api.nvim_get_namespaces()["acp-chat-spin"]
+  local out = {}
+  for _, m in ipairs(vim.api.nvim_buf_get_extmarks(buf, ns, 0, -1, { details = true })) do
+    out[m[2]] = m[4].virt_text[1][1]
+  end
+  return out
+end
+
+---Drive the shared spinner timer one tick without waiting on real time.
+local function tick()
+  vim.wait(200, function()
+    return false
+  end)
+end
+
+function T.in_flight_tool_call_spins_next_to_its_title()
+  n = n + 1
+  local thread = h.thread("chat-test-" .. n)
+  local buf = chat.ensure_buf(thread)
+  chat.append(thread, "tool", "Edit file.lua", "tc", "edit")
+  chat.set_status(thread, "tc", "in_progress")
+  tick()
+  -- Lines: 0 blank, 1 the title — the glyph rides at the end of line 1.
+  local marks = spinners(buf)
+  eq(1, vim.tbl_count(marks), "one spinner")
+  eq(true, vim.tbl_contains(require("acp.util").spinner, vim.trim(marks[1])), "a spinner frame: " .. tostring(marks[1]))
+  -- It animates rather than sitting on one frame.
+  local first = marks[1]
+  vim.wait(600, function()
+    return spinners(buf)[1] ~= first
+  end)
+  eq(true, spinners(buf)[1] ~= first, "frame advanced")
+end
+
+function T.spinner_stops_when_the_call_completes()
+  n = n + 1
+  local thread = h.thread("chat-test-" .. n)
+  local buf = chat.ensure_buf(thread)
+  chat.append(thread, "tool", "Edit file.lua", "tc", "edit")
+  chat.set_status(thread, "tc", "in_progress")
+  tick()
+  eq(1, vim.tbl_count(spinners(buf)), "spinning while in flight")
+  chat.set_status(thread, "tc", "completed")
+  eq(0, vim.tbl_count(spinners(buf)), "glyph gone once completed")
+  tick()
+  eq(0, vim.tbl_count(spinners(buf)), "and it does not come back")
+end
+
+function T.stop_spinners_clears_calls_the_agent_left_hanging()
+  n = n + 1
+  local thread = h.thread("chat-test-" .. n)
+  local buf = chat.ensure_buf(thread)
+  chat.append(thread, "tool", "Read a.lua", "t1", "read")
+  chat.append(thread, "tool", "Read b.lua", "t2", "read")
+  chat.set_status(thread, "t1", "in_progress")
+  chat.set_status(thread, "t2", "pending")
+  tick()
+  eq(2, vim.tbl_count(spinners(buf)), "both in flight")
+  chat.stop_spinners(thread)
+  eq(0, vim.tbl_count(spinners(buf)))
+end
+
+function T.completed_tool_call_never_spins()
+  n = n + 1
+  local thread = h.thread("chat-test-" .. n)
+  local buf = chat.ensure_buf(thread)
+  chat.append(thread, "tool", "Edit file.lua", "tc", "edit")
+  chat.set_status(thread, "tc", "completed")
+  chat.set_status(thread, "unknown-id", "in_progress") -- ignored, not a crash
+  tick()
+  eq(0, vim.tbl_count(spinners(buf)))
+end
+
 function T.toggle_expands_collapsed_tool_entry()
   local thread, buf = open_chat()
   local before = vim.api.nvim_buf_line_count(buf)

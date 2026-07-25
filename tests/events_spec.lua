@@ -104,7 +104,9 @@ end
 function T.tool_text_status_suffix()
   ui({ diff_max_lines = 24 })
   eq("thing ✗", events.tool_text({ title = "thing", status = "failed" }))
-  eq("thing …", events.tool_text({ title = "thing", status = "pending" }))
+  -- Unfinished calls carry no suffix: the chat spins a glyph next to them.
+  eq("thing", events.tool_text({ title = "thing", status = "pending" }))
+  eq("thing", events.tool_text({ title = "thing", status = "in_progress" }))
   eq("thing", events.tool_text({ title = "thing", status = "completed" }))
 end
 
