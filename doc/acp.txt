@@ -13,10 +13,11 @@ CONTENTS                                                        *acp-contents*
   5. Keymaps .............................. |acp-keymaps|
   6. The prompt queue ..................... |acp-queue|
   7. The plan panel ....................... |acp-plan|
-  8. Options .............................. |acp-options|
-  9. Statusline ........................... |acp-statusline|
- 10. Highlights ........................... |acp-highlights|
- 11. Health ............................... |acp-health|
+  8. Subagents ............................ |acp-subagents|
+  9. Options .............................. |acp-options|
+ 10. Statusline ........................... |acp-statusline|
+ 11. Highlights ........................... |acp-highlights|
+ 12. Health ............................... |acp-health|
 
 ==============================================================================
 1. INTRODUCTION                                             *acp-introduction*
@@ -120,6 +121,8 @@ Chat input:
   gm            Session config picker (mode / model)
   gq            Edit the queued prompts, see |acp-queue|
   gp            Show the plan the agent is working from, see |acp-plan|
+  gs            Show the subagents spawned in this thread, see
+                |acp-subagents|
   gf            Toggle follow mode (jump to where the agent works)
   /             Agent slash commands (at the start of the input)
   @             Complete project files into whole-file context chips
@@ -136,7 +139,8 @@ Chat transcript:
   <C-c>         Interrupt the agent
   gd            Jump to the code location of the tool call under the
                 cursor (agents report the file/line they touched)
-  gm gq gp gf   As in the input window
+  gm gq gp gs gf
+                As in the input window
 
 The transcript cursor only rests on content lines; blank separator lines
 are skipped in the direction of movement.
@@ -172,7 +176,35 @@ The plan is saved with the thread, so it is still there after a restart.
 Agents that never send a plan simply have none, and `gp` says so.
 
 ==============================================================================
-8. OPTIONS                                                       *acp-options*
+8. SUBAGENTS                                                   *acp-subagents*
+
+Agents delegate parts of a job to subagents that work on their own and
+report back. ACP has no first-class notion of one, so they arrive as
+ordinary tool calls; acp.nvim recognises them by title (|acp-options|
+`subagent_patterns`, matching Claude Code's `Task` and the usual naming by
+default).
+
+A recognised spawn gets the `◇` icon in the transcript instead of the
+generic tool glyph, and joins the thread's subagent list.
+
+`gs` opens that list in a float — one row per subagent with its status
+(`○` queued, `◐` running, `✓` done, `✗` failed) and how long it ran. The
+rows are a snapshot, so reopen it to re-read the clock; `q` or `:q` closes
+it. While any subagent is still running, the chat winbar shows the count as
+`◇ 2`.
+
+The list covers the current run of the thread only (the transcript is the
+durable record): it survives an idle agent process being stopped and
+revived, but not a restart of Neovim.
+
+If your agent names its delegation tool something else, add a pattern: >lua
+
+  require("acp").setup({
+    subagent_patterns = { "^Task%f[%W]", "^Delegate" },
+  })
+<
+==============================================================================
+9. OPTIONS                                                       *acp-options*
 
 Defaults: >lua
 
@@ -207,6 +239,12 @@ Defaults: >lua
     -- on the first message).
     autostart = true,
 
+    -- Tool calls whose title matches one of these Lua patterns are
+    -- treated as subagent spawns, see |acp-subagents|.
+    subagent_patterns = {
+      "^Task%f[%W]", "^Agent%f[%W]", "^Explore%f[%W]", "[Ss]ubagent",
+    },
+
     -- Kill the process of a thread idle this long (seconds). Only applies
     -- to agents that support session/load; others are kept alive.
     idle_timeout = 900,
@@ -239,7 +277,8 @@ Defaults: >lua
         error = "✗",
         tool = "󰖷",
         -- Per ACP tool kind overrides (read/edit/delete/move/search/
-        -- execute/think/fetch). Trailing spaces are respected so wide
+        -- execute/think/fetch), plus "subagent" — a pseudo-kind for
+        -- calls that spawn one. Trailing spaces are respected so wide
         -- nerd-font glyphs can bake in the spacing they need.
         tool_kinds = {
           read = " ",
@@ -277,7 +316,7 @@ Defaults: >lua
   })
 <
 ==============================================================================
-9. STATUSLINE                                                 *acp-statusline*
+10. STATUSLINE                                                *acp-statusline*
 
 `require("acp").statusline()` returns a compact summary such as `●2 ?1`
 (two threads working, one needing attention), or an empty string when there
@@ -286,7 +325,7 @@ are no threads. Example for a custom statusline: >lua
   vim.o.statusline = "%f %= %{v:lua.require'acp'.statusline()} "
 <
 ==============================================================================
-10. HIGHLIGHTS                                                *acp-highlights*
+11. HIGHLIGHTS                                                *acp-highlights*
 
 All groups are defined with `default = true` links and can be overridden:
 
@@ -313,7 +352,7 @@ All groups are defined with `default = true` links and can be overridden:
   AcpChip             context chips            -> Special
 
 ==============================================================================
-11. HEALTH                                                        *acp-health*
+12. HEALTH                                                        *acp-health*
 
 `:checkhealth acp` verifies the Neovim version, the configured agent
 commands, git (for worktrees), and Node.js availability.

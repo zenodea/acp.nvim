@@ -134,7 +134,7 @@ function M.reveal(thread, path, line)
   return win
 end
 
----Refresh the chat winbar: "name · agent [mode]  ▤ 2/5".
+---Refresh the chat winbar: "name · agent [mode]  ▤ 2/5  ◇ 1".
 ---@param thread Thread
 function M.update_winbar(thread)
   if not thread:tab_valid() then
@@ -168,6 +168,10 @@ function M.update_winbar(thread)
   local done, total = require("acp.ui.plan").progress(thread)
   if total > 0 then
     text = text .. ("  ▤ %d/%d"):format(done, total)
+  end
+  local subagents = require("acp.ui.subagents").running(thread)
+  if subagents > 0 then
+    text = text .. ("  ◇ %d"):format(subagents)
   end
   if session and session.starting then
     text = text .. "  " .. (session.spinner or "…") .. " starting"

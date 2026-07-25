@@ -758,6 +758,20 @@ function Session:ensure_turn_header()
   chat().append(self.thread, "agent", provider .. (model and (" · " .. model) or ""))
 end
 
+---Record a tool call that spawned a subagent (see acp.ui.subagents) and
+---report the tool kind its transcript entry should be iconed with: the
+---pseudo-kind "subagent" for a spawn, the call's own ACP kind otherwise.
+---@param id string toolCallId
+---@param call table merged tool-call state
+---@return string|nil tool_kind
+function Session:track_subagent(id, call)
+  if not require("acp.ui.subagents").track(self.thread, id, call.title, call.status) then
+    return call.kind
+  end
+  require("acp.ui.workspace").update_winbar(self.thread)
+  return "subagent"
+end
+
 ---Live state of a tool call, if this session still holds it.
 ---@param id string
 ---@return table|nil
@@ -861,7 +875,8 @@ function Session:on_notification(method, params)
       content = u.content,
       locations = u.locations,
     }
-    chat().append(self.thread, "tool", events.tool_text(self.tool_calls[id]), id, u.kind)
+    local tool_kind = self:track_subagent(id, self.tool_calls[id])
+    chat().append(self.thread, "tool", events.tool_text(self.tool_calls[id]), id, tool_kind)
     chat().set_loc(self.thread, id, u.locations and u.locations[1])
     self:maybe_follow(u.locations)
   elseif kind == "tool_call_update" then
@@ -877,9 +892,10 @@ function Session:on_notification(method, params)
         end
       end
       self.tool_calls[id] = call
+      local tool_kind = self:track_subagent(id, call)
       local text = events.tool_text(call)
       if not chat().update_by_id(self.thread, id, text) then
-        chat().append(self.thread, "tool", text, id, call.kind)
+        chat().append(self.thread, "tool", text, id, tool_kind)
       end
       chat().set_loc(self.thread, id, u.locations and u.locations[1])
       self:maybe_follow(u.locations)
