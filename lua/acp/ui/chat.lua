@@ -2,6 +2,7 @@ local M = {}
 
 local ns = vim.api.nvim_create_namespace("acp-chat")
 local ns_pad = vim.api.nvim_create_namespace("acp-chat-pad")
+local ns_spin = vim.api.nvim_create_namespace("acp-chat-spin")
 
 ---Per-thread render state: line range of every transcript entry (so entries
 ---can be re-rendered in place for streaming chunks and tool-call updates).
@@ -15,8 +16,22 @@ local default_collapsed = { tool = true, thinking = true }
 
 ---@param thread Thread
 local function st(thread)
-  state[thread.id] = state[thread.id] or { ranges = {}, by_id = {}, open = false, collapsed = {}, prev_count = 1 }
-  return state[thread.id]
+  local s = state[thread.id]
+  if not s then
+    s = { ranges = {}, by_id = {}, open = false, collapsed = {}, prev_count = 1, spinning = {}, thread = thread }
+    state[thread.id] = s
+  end
+  return s
+end
+
+---Live chat buffer of a render state, if it still has one.
+---@param s table chat state
+---@return integer|nil bufnr
+local function state_buf(s)
+  local buf = s.thread and s.thread.chat_buf
+  if buf and vim.api.nvim_buf_is_valid(buf) then
+    return buf
+  end
 end
 
 ---Icons carry their own trailing spacing when it matters (wide nerd-font
@@ -90,6 +105,90 @@ local function update_pad(buf)
     id = 1,
     virt_lines = { { { " ", "Normal" } } },
   })
+end
+
+---Drop the spinner glyph of entry `index`, if it has one.
+---@param s table chat state
+---@param index integer
+local function del_spinner(s, index)
+  local buf = state_buf(s)
+  if buf then
+    pcall(vim.api.nvim_buf_del_extmark, buf, ns_spin, index)
+  end
+end
+
+---Current spinner frame, shared by every in-flight tool call so they animate
+---in step rather than each on its own phase.
+local frame = require("acp.util").spinner[1]
+
+---Redraw the spinner next to every tool call still in flight. Virtual text,
+---not buffer text: it costs one extmark per tick instead of re-rendering the
+---entry, and never shifts the transcript around.
+---@type {start: fun(), stop: fun()}
+local spin -- declared first: the tick callback stops the timer it belongs to
+spin = require("acp.util").spinner_timer(function(f)
+  frame = f
+  local any = false
+  for _, s in pairs(state) do
+    local buf = next(s.spinning) and state_buf(s)
+    if buf then
+      any = true
+      for index in pairs(s.spinning) do
+        local range = s.ranges[index]
+        if range then
+          -- start + 1 is the title line: entries open with a blank line, and
+          -- a collapsed tool call keeps its title as the only visible one.
+          pcall(vim.api.nvim_buf_set_extmark, buf, ns_spin, range.start + 1, 0, {
+            id = index,
+            virt_text = { { " " .. frame, "AcpChatTool" } },
+            virt_text_pos = "eol",
+          })
+        end
+      end
+    end
+  end
+  if not any then
+    spin.stop()
+  end
+end)
+
+---Run (or stop) the spinner next to the tool call registered under `id`,
+---following its ACP status. Unknown ids are ignored, so this is safe to call
+---for every tool-call update.
+---@param thread Thread
+---@param id string
+---@param status string|nil ACP tool-call status
+function M.set_status(thread, id, status)
+  local s = st(thread)
+  local index = s.by_id[id]
+  if not index then
+    return
+  end
+  local live = status == "pending" or status == "in_progress"
+  if live == (s.spinning[index] == true) then
+    return
+  end
+  if live then
+    s.spinning[index] = true
+    spin.start()
+  else
+    s.spinning[index] = nil
+    del_spinner(s, index)
+  end
+end
+
+---Stop every spinner in this thread: the turn is over, so a call the agent
+---never marked finished is not running either.
+---@param thread Thread
+function M.stop_spinners(thread)
+  local s = state[thread.id]
+  if not s then
+    return
+  end
+  for index in pairs(s.spinning) do
+    del_spinner(s, index)
+  end
+  s.spinning = {}
 end
 
 local kind_hl = {
@@ -572,10 +671,13 @@ function M.replay(thread)
   s.by_id = {}
   s.open = false
   s.collapsed = {}
+  -- Entry indices are about to be rebuilt; nothing replayed is in flight.
+  s.spinning = {}
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, {})
   vim.bo[buf].modifiable = false
   vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
+  vim.api.nvim_buf_clear_namespace(buf, ns_spin, 0, -1)
   for _, entry in ipairs(thread.transcript) do
     push_render(thread, buf, entry)
   end

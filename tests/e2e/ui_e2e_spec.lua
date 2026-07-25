@@ -137,6 +137,27 @@ T.subagent_spawns_are_tracked_and_listed = H.test("delegating", function(thread)
   H.feed(0, "q")
 end)
 
+T.in_flight_tool_call_shows_a_spinner = H.test("slow_tool", function(thread)
+  local ns = vim.api.nvim_get_namespaces()["acp-chat-spin"]
+  local function glyphs()
+    return vim.api.nvim_buf_get_extmarks(thread.chat_buf, ns, 0, -1, { details = true })
+  end
+  H.send(thread, "run it")
+  H.wait_for(function()
+    return #glyphs() > 0
+  end, "spinner next to the in-flight tool call")
+  local marks = glyphs()
+  local row, text = marks[1][2], marks[1][4].virt_text[1][1]
+  local title = vim.api.nvim_buf_get_lines(thread.chat_buf, row, row + 1, false)[1]
+  eq(true, title:find("Run the suite", 1, true) ~= nil, "spinner sits on the title line: " .. title)
+  eq(true, vim.tbl_contains(require("acp.util").spinner, vim.trim(text)), "a spinner frame: " .. text)
+
+  -- Ending the turn stops it, even though the agent never marked the call done.
+  thread.session:interrupt()
+  H.wait_done(thread)
+  eq(0, #glyphs(), "spinner cleared at turn end")
+end)
+
 T.interrupt_marks_turn_interrupted = H.test("cancel_me", function(thread)
   H.send(thread, "go")
   H.wait_for(function()
