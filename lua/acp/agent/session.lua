@@ -885,10 +885,14 @@ function Session:on_notification(method, params)
       self:maybe_follow(u.locations)
     end
   elseif kind == "plan" then
+    -- Latest plan wins, and it outlives the transcript entry: the panel (gp)
+    -- and the winbar step count read it from the thread.
+    self.thread.plan = u.entries or {}
     local text = events.plan_text(u.entries)
     if not chat().update_by_id(self.thread, "plan", text) then
       chat().append(self.thread, "plan", text, "plan")
     end
+    require("acp.ui.workspace").update_winbar(self.thread)
   elseif kind == "available_commands_update" then
     self.commands = u.availableCommands or {}
   elseif kind == "config_option_update" then

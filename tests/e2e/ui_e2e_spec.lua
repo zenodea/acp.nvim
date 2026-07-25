@@ -104,6 +104,18 @@ T.tool_call_update_renders_in_place = H.test("tool_diff", function(thread)
   eq(true, #marks > 0, "chat extmarks present")
 end)
 
+T.plan_reaches_winbar_and_panel = H.test("planning", function(thread)
+  H.send(thread, "plan it")
+  H.wait_done(thread)
+  eq(true, H.chat_has(thread, "◐ Write the parser"), "plan in the transcript")
+  eq(true, vim.wo[H.win(thread, "chat")].winbar:find("▤ 1/3", 1, true) ~= nil, "step count in the winbar")
+  -- gp opens the latest plan wherever you are in the conversation.
+  H.feed(H.win(thread, "chat"), "gp")
+  eq("editor", vim.api.nvim_win_get_config(0).relative, "plan panel is a float")
+  eq({ " ✓ Read the spec", " ◐ Write the parser", " ○ Add tests" }, vim.api.nvim_buf_get_lines(0, 0, -1, false))
+  H.feed(0, "q")
+end)
+
 T.interrupt_marks_turn_interrupted = H.test("cancel_me", function(thread)
   H.send(thread, "go")
   H.wait_for(function()

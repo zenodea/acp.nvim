@@ -156,14 +156,16 @@ function M.tool_text(call)
   return table.concat(lines, "\n")
 end
 
+---Step-status glyphs, shared by the transcript and the plan panel.
+M.plan_icons = { pending = "○", in_progress = "◐", completed = "✓" }
+
 ---Rendered text for a plan update.
 ---@param entries table[]
 ---@return string
 function M.plan_text(entries)
-  local icons = { pending = "○", in_progress = "◐", completed = "✓" }
   local lines = { "Plan:" }
   for _, e in ipairs(entries or {}) do
-    table.insert(lines, string.format("  %s %s", icons[e.status] or "○", e.content or ""))
+    table.insert(lines, string.format("  %s %s", M.plan_icons[e.status] or M.plan_icons.pending, e.content or ""))
   end
   return table.concat(lines, "\n")
 end

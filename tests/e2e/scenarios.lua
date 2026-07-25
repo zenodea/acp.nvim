@@ -37,6 +37,21 @@ return {
     },
   },
 
+  planning = {
+    turns = {
+      {
+        {
+          plan = {
+            { content = "Read the spec", status = "completed", priority = "high" },
+            { content = "Write the parser", status = "in_progress", priority = "high" },
+            { content = "Add tests", status = "pending", priority = "medium" },
+          },
+        },
+        { chunk = "Planned." },
+      },
+    },
+  },
+
   permission = {
     turns = {
       {
