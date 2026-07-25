@@ -116,6 +116,27 @@ T.plan_reaches_winbar_and_panel = H.test("planning", function(thread)
   H.feed(0, "q")
 end)
 
+T.subagent_spawns_are_tracked_and_listed = H.test("delegating", function(thread)
+  H.send(thread, "delegate it")
+  H.wait_done(thread)
+  -- Spawns get ◇ in the transcript instead of the generic tool glyph; the
+  -- plain edit call is left alone and never tracked.
+  eq(true, H.chat_has(thread, "◇ Task: audit the parser"), "first spawn iconed")
+  eq(true, H.chat_has(thread, "◇ Explore the loader"), "second spawn iconed")
+  eq(2, #thread.subagents, "the ordinary tool call was not tracked")
+  -- One of the two is still going, so the winbar keeps its count.
+  eq(true, vim.wo[H.win(thread, "chat")].winbar:find("◇ 1", 1, true) ~= nil, "running count in the winbar")
+
+  H.feed(H.win(thread, "chat"), "gs")
+  eq("editor", vim.api.nvim_win_get_config(0).relative, "subagent panel is a float")
+  local rows = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  eq(true, rows[1]:find("✓ Task: audit the parser", 1, true) ~= nil, "row 1: " .. rows[1])
+  eq(true, rows[1]:find("done ·", 1, true) ~= nil, "row 1: " .. rows[1])
+  eq(true, rows[2]:find("◐ Explore the loader", 1, true) ~= nil, "row 2: " .. rows[2])
+  eq(true, rows[2]:find("running ·", 1, true) ~= nil, "row 2: " .. rows[2])
+  H.feed(0, "q")
+end)
+
 T.interrupt_marks_turn_interrupted = H.test("cancel_me", function(thread)
   H.send(thread, "go")
   H.wait_for(function()

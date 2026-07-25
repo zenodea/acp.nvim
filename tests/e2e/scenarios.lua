@@ -52,6 +52,20 @@ return {
     },
   },
 
+  -- One spawn that finishes and one still going when the turn ends, so both
+  -- subagent states are observable without racing the fake agent.
+  delegating = {
+    turns = {
+      {
+        { tool_call = { toolCallId = "s1", title = "Task: audit the parser", kind = "other", status = "in_progress" } },
+        { tool_update = { toolCallId = "s1", status = "completed" } },
+        { tool_call = { toolCallId = "s2", title = "Explore the loader", kind = "other", status = "in_progress" } },
+        { tool_call = { toolCallId = "t1", title = "Edit foo.lua", kind = "edit", status = "in_progress" } },
+        { chunk = "Delegated." },
+      },
+    },
+  },
+
   permission = {
     turns = {
       {

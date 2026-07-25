@@ -39,6 +39,8 @@ failed. Background threads that need attention also fire a notification, and
 - [x] Prompt queue shown in the input winbar, editable with `gq`
 - [x] Plan panel (`gp`): the agent's current plan on demand, step count in
       the chat winbar
+- [x] Subagent panel (`gs`): what the agent delegated, with status and
+      runtime; running count in the chat winbar
 - [x] Follow mode: jump to where the agent is working (`gf`)
 - [x] Persistence: threads, layouts, and conversations survive restarts
 - [x] Auto-titled threads, in-editor authentication
@@ -82,8 +84,8 @@ Sidebar: `Enter` open, `n` new (inside a workspace section, the new thread
 uses that workspace), `d` delete, `r` rename.
 
 Chat input: `Enter` send, `Ctrl-j` newline, `Ctrl-c` interrupt, `Ctrl-p`/`Ctrl-n`
-history, `gm` config, `gq` edit queued prompts, `gp` plan, `gf` follow, `/`
-commands, `y`/`a`/`n` permissions.
+history, `gm` config, `gq` edit queued prompts, `gp` plan, `gs` subagents,
+`gf` follow, `/` commands, `y`/`a`/`n` permissions.
 
 Chat transcript: `Enter` expand/collapse an entry, `Shift-Enter` open a tool
 call's full content in a float (`q` closes), `gd` jump to the code a tool
@@ -98,6 +100,12 @@ Agents that plan their work send their steps as they go. They land in the
 transcript, but scroll away; `gp` opens the latest plan in a float (`○` not
 started, `◐` in progress, `✓` done, `q` closes), and the chat winbar carries
 the step count as `▤ 2/5` while a plan is live.
+
+Work an agent delegates arrives as an ordinary tool call — ACP has no notion
+of a subagent — so acp.nvim recognises them by title (`subagent_patterns`,
+covering Claude Code's `Task` by default). Spawns get the `◇` icon in the
+transcript, `gs` lists them with status and runtime, and the winbar shows
+`◇ 2` while any are still running.
 
 ## Configuration
 
@@ -115,6 +123,8 @@ require("acp").setup({
   mcp_servers = {},     -- MCP servers forwarded to every agent session
   autostart = true,     -- boot the agent session when a thread is opened
   idle_timeout = 900,   -- seconds before an idle agent process is stopped
+  -- tool calls whose title matches are treated as subagent spawns
+  subagent_patterns = { "^Task%f[%W]", "^Agent%f[%W]", "^Explore%f[%W]", "[Ss]ubagent" },
   ui = {
     sidebar_width = 30,
     chat_width = 64,

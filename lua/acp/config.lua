@@ -23,6 +23,13 @@ M.defaults = {
   -- first message), so the agent is ready when you start typing.
   autostart = true,
 
+  -- ACP has no first-class notion of a subagent: an agent that delegates
+  -- work reports it as an ordinary tool call. Calls whose title matches one
+  -- of these Lua patterns are treated as spawns — their own icon in the
+  -- transcript, and a row in the subagent panel (gs). `%f[%W]` is a word
+  -- boundary, so "Task" matches but "Taskbar" does not.
+  subagent_patterns = { "^Task%f[%W]", "^Agent%f[%W]", "^Explore%f[%W]", "[Ss]ubagent" },
+
   -- Kill the process of a thread that has been idle this long (seconds).
   -- Only applies to agents that support session/load (the conversation is
   -- reloaded on next use); others are kept alive.
@@ -57,11 +64,13 @@ M.defaults = {
       error = "✗",
       tool = "󰖷",
       -- Per ACP tool kind overrides (read/edit/delete/move/search/execute/
-      -- think/fetch). Trailing spaces are respected: wide nerd-font glyphs
-      -- can bake in the spacing they need.
+      -- think/fetch), plus "subagent" — a pseudo-kind for tool calls that
+      -- spawn one (see subagent_patterns). Trailing spaces are respected:
+      -- wide nerd-font glyphs can bake in the spacing they need.
       tool_kinds = {
         read = " ",
         edit = " ",
+        subagent = "◇",
       },
       thinking = "✱",
       permission = "⚠",
