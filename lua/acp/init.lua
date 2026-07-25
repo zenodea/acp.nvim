@@ -320,7 +320,7 @@ function M.new(name, opts)
 end
 
 ---Create a thread in a brand-new git worktree, naming both: the worktree
----first, then the thread (which defaults to the same name), then the agent.
+---first, then the thread, then the agent.
 ---The plain |M.new| flow asks for the workspace last and offers the main
 ---checkout and existing worktrees too; this one goes straight to a fresh one.
 function M.new_worktree()
@@ -341,7 +341,7 @@ function M.new_worktree()
       vim.notify("acp: worktree '" .. slug .. "' already exists", vim.log.levels.ERROR)
       return
     end
-    vim.ui.input({ prompt = "Thread name: ", default = vim.trim(wtname) }, function(name)
+    vim.ui.input({ prompt = "Thread name: " }, function(name)
       if not name or vim.trim(name) == "" then
         return
       end
