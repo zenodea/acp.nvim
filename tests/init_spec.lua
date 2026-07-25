@@ -67,6 +67,89 @@ function T.new_worktree_thread_prompts_for_worktree_name()
   registry.remove(t)
 end
 
+function T.new_worktree_names_the_worktree_then_the_thread()
+  local cfg = require("acp.config")
+  local registry = require("acp.core.registry")
+  local wt_mod = require("acp.core.worktree")
+  local old_autostart, real_create = cfg.options.autostart, wt_mod.create
+  local old_select, old_input = vim.ui.select, vim.ui.input
+  cfg.options.autostart = false
+  local created_name, prompts = nil, {}
+  wt_mod.create = function(_, slug)
+    created_name = slug
+    return { path = "/tmp/fake-wt/" .. slug, branch = "agents/" .. slug }
+  end
+  vim.ui.select = function(items, opts, cb)
+    assert(not (opts.prompt or ""):find("Workspace"), "workspace picker must not appear")
+    cb(items[1], 1) -- agent picker only
+  end
+  -- Worktree name first, then the thread name (pre-filled with it).
+  local answers = { "Flaky Tests", "hunt the flakes" }
+  vim.ui.input = function(opts, cb)
+    table.insert(prompts, { prompt = opts.prompt, default = opts.default })
+    cb(answers[#prompts])
+  end
+
+  local ok, err = pcall(require("acp").new_worktree)
+
+  vim.ui.select, vim.ui.input = old_select, old_input
+  wt_mod.create = real_create
+  cfg.options.autostart = old_autostart
+  assert(ok, err)
+
+  eq("Worktree name: ", prompts[1].prompt)
+  eq("Thread name: ", prompts[2].prompt)
+  eq("Flaky Tests", prompts[2].default, "thread name defaults to the worktree name")
+  eq("flaky-tests", created_name, "worktree slugified from its own prompt")
+  local t = registry.threads[#registry.threads]
+  eq("hunt the flakes", t.name, "thread keeps the name you gave it")
+  eq("agents/flaky-tests", t.worktree.branch)
+  require("acp.ui.workspace").close(t)
+  vim.cmd("silent! tabonly!")
+  registry.remove(t)
+end
+
+function T.new_worktree_refuses_a_name_already_taken()
+  local wt_mod = require("acp.core.worktree")
+  local registry = require("acp.core.registry")
+  local real_create, real_path_for = wt_mod.create, wt_mod.path_for
+  local old_input, old_notify = vim.ui.input, vim.notify
+  local before = #registry.threads
+  local created, notified = false, nil
+  wt_mod.create = function()
+    created = true
+  end
+  -- Point the would-be worktree at a directory that exists.
+  wt_mod.path_for = function()
+    return vim.fn.tempname()
+  end
+  local existing = wt_mod.path_for()
+  vim.fn.mkdir(existing, "p")
+  wt_mod.path_for = function()
+    return existing
+  end
+  vim.notify = function(msg)
+    notified = msg
+  end
+  local prompts = 0
+  vim.ui.input = function(_, cb)
+    prompts = prompts + 1
+    cb("taken")
+  end
+
+  local ok, err = pcall(require("acp").new_worktree)
+
+  vim.ui.input, vim.notify = old_input, old_notify
+  wt_mod.create, wt_mod.path_for = real_create, real_path_for
+  vim.fn.delete(existing, "d")
+  assert(ok, err)
+
+  eq(1, prompts, "stops at the worktree prompt, never asks for a thread name")
+  eq(false, created, "no worktree created")
+  eq(before, #registry.threads, "no thread created")
+  eq(true, notified ~= nil and notified:find("already exists", 1, true) ~= nil, "notified: " .. tostring(notified))
+end
+
 function T.preset_workspace_skips_the_picker()
   local cfg = require("acp.config")
   local registry = require("acp.core.registry")

@@ -244,7 +244,13 @@ function M.new(name, opts)
     local root = registry().root
     local preset = opts and opts.workspace
     if preset ~= nil then
-      create_thread(n, preset and { adopt = preset } or false, agent)
+      -- false = the main checkout, { create = slug } = a fresh worktree,
+      -- any other table = an existing worktree to adopt.
+      local ws = preset
+      if type(preset) == "table" and not preset.create then
+        ws = { adopt = preset }
+      end
+      create_thread(n, ws, agent)
       return
     end
     if not require("acp.util").git_root(root) then
@@ -306,6 +312,37 @@ function M.new(name, opts)
   else
     vim.ui.input({ prompt = "Thread name: " }, with_name)
   end
+end
+
+---Create a thread in a brand-new git worktree, naming both: the worktree
+---first, then the thread (which defaults to the same name), then the agent.
+---The plain |M.new| flow asks for the workspace last and offers the main
+---checkout and existing worktrees too; this one goes straight to a fresh one.
+function M.new_worktree()
+  ensure_setup()
+  local util = require("acp.util")
+  local root = registry().root
+  if not util.git_root(root) then
+    vim.notify("acp: not a git repository — worktrees need one", vim.log.levels.WARN)
+    return
+  end
+  vim.ui.input({ prompt = "Worktree name: " }, function(wtname)
+    if not wtname or vim.trim(wtname) == "" then
+      return
+    end
+    local slug = util.slugify(vim.trim(wtname))
+    -- Say so now rather than after the thread name and agent are picked.
+    if vim.fn.isdirectory(require("acp.core.worktree").path_for(root, slug)) == 1 then
+      vim.notify("acp: worktree '" .. slug .. "' already exists", vim.log.levels.ERROR)
+      return
+    end
+    vim.ui.input({ prompt = "Thread name: ", default = vim.trim(wtname) }, function(name)
+      if not name or vim.trim(name) == "" then
+        return
+      end
+      M.new(name, { workspace = { create = slug } })
+    end)
+  end)
 end
 
 ---Open the sidebar / last active thread (entry point for :Acp).
