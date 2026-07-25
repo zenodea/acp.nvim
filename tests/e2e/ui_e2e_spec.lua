@@ -104,6 +104,28 @@ T.tool_call_update_renders_in_place = H.test("tool_diff", function(thread)
   eq(true, #marks > 0, "chat extmarks present")
 end)
 
+T.context_counter_reaches_the_winbar = H.test("reports_usage", function(thread)
+  eq(nil, vim.wo[H.win(thread, "chat")].winbar:find("%%"), "no counter before the agent reports one")
+  H.send(thread, "hi")
+  H.wait_done(thread)
+  eq({ used = 42000, size = 200000 }, thread.usage, "usage recorded on the thread")
+  -- 42k of 200k is 21%; the winbar stores it %-escaped for statusline syntax.
+  local winbar = vim.wo[H.win(thread, "chat")].winbar
+  eq(true, winbar:find("◔ 21%%", 1, true) ~= nil, "winbar: " .. winbar)
+end)
+
+-- 'winbar' takes statusline syntax, so a bare % in a name (or in the context
+-- counter) used to raise E539 and leave the winbar unset.
+T.percent_in_a_thread_name_survives_the_winbar = H.test("greeting", function(thread)
+  thread.usage = { used = 1, size = 2 }
+  thread.name = "50% done"
+  require("acp.ui.workspace").update_winbar(thread)
+  local win = H.win(thread, "chat")
+  local rendered = vim.api.nvim_eval_statusline(vim.wo[win].winbar, { winid = win, use_winbar = true }).str
+  eq(true, rendered:find("50% done", 1, true) ~= nil, "rendered: " .. rendered)
+  eq(true, rendered:find("◑ 50%", 1, true) ~= nil, "rendered: " .. rendered)
+end)
+
 T.plan_reaches_winbar_and_panel = H.test("planning", function(thread)
   H.send(thread, "plan it")
   H.wait_done(thread)

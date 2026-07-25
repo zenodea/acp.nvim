@@ -53,6 +53,8 @@ local function play(steps)
       update(u)
     elseif step.plan then
       update({ sessionUpdate = "plan", entries = step.plan })
+    elseif step.usage then
+      update(vim.tbl_extend("force", { sessionUpdate = "usage_update" }, step.usage))
     elseif step.permission then
       next_id = next_id + 1
       send({

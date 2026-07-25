@@ -154,6 +154,26 @@ function M.tool_text(call)
   return table.concat(lines, "\n")
 end
 
+---Gauge glyphs for the context window, filling up as it does.
+local usage_glyphs = { "○", "◔", "◑", "◕", "●" }
+
+---Compact context-window gauge for the chat winbar, e.g. "◔ 21%". Nil until
+---the agent has reported usable numbers (ACP `usage_update`); agents that
+---never send one simply have no counter.
+---@param usage {used: integer, size: integer}|nil
+---@return string|nil
+function M.usage_text(usage)
+  if type(usage) ~= "table" then
+    return nil
+  end
+  local used, size = tonumber(usage.used), tonumber(usage.size)
+  if not used or not size or size <= 0 then
+    return nil
+  end
+  local pct = math.min(math.floor(used / size * 100 + 0.5), 100)
+  return string.format("%s %d%%", usage_glyphs[math.min(math.floor(pct / 25 + 0.5), 4) + 1], pct)
+end
+
 ---Step-status glyphs, shared by the transcript and the plan panel.
 M.plan_icons = { pending = "○", in_progress = "◐", completed = "✓" }
 

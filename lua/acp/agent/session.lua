@@ -910,6 +910,12 @@ function Session:on_notification(method, params)
       chat().append(self.thread, "plan", text, "plan")
     end
     require("acp.ui.workspace").update_winbar(self.thread)
+  elseif kind == "usage_update" then
+    -- How full the model's context window is. Live-session state, so it is
+    -- kept on the thread but never persisted: a restored number would
+    -- describe a context this process no longer has.
+    self.thread.usage = { used = u.used, size = u.size }
+    require("acp.ui.workspace").update_winbar(self.thread)
   elseif kind == "available_commands_update" then
     self.commands = u.availableCommands or {}
   elseif kind == "config_option_update" then

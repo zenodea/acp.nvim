@@ -110,6 +110,26 @@ function T.tool_text_status_suffix()
   eq("thing", events.tool_text({ title = "thing", status = "completed" }))
 end
 
+function T.usage_gauge_fills_with_the_context_window()
+  local function g(used, size)
+    return events.usage_text({ used = used, size = size })
+  end
+  eq("○ 0%", g(0, 200000))
+  eq("○ 10%", g(20000, 200000))
+  eq("◔ 21%", g(42000, 200000))
+  eq("◑ 50%", g(100000, 200000))
+  eq("◕ 75%", g(150000, 200000))
+  eq("● 100%", g(200000, 200000))
+  -- Agents may report more used than the window after a compaction race.
+  eq("● 100%", g(250000, 200000), "clamped at 100")
+end
+
+function T.usage_gauge_is_absent_without_usable_numbers()
+  eq(nil, events.usage_text(nil), "no usage reported yet")
+  eq(nil, events.usage_text({ used = 10 }), "no window size")
+  eq(nil, events.usage_text({ used = 10, size = 0 }), "zero window size")
+end
+
 function T.plan_text_step_glyphs()
   local text = events.plan_text({
     { status = "completed", content = "done step" },

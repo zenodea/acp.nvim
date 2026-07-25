@@ -5,6 +5,7 @@
 ---  { tool_call = {...} }       tool_call update (toolCallId, title, kind, ...)
 ---  { tool_update = {...} }     tool_call_update (merged into the call)
 ---  { plan = { entries } }      plan update
+---  { usage = { used, size } }  usage_update (context window occupancy)
 ---  { permission = {...} }      session/request_permission; blocks on the answer
 ---  { wait_cancel = true }      block until session/cancel; reply cancelled
 ---  { exit = code }             kill the agent process mid-turn
@@ -34,6 +35,12 @@ return {
         { tool_update = { toolCallId = "t1", status = "completed", content = DIFF } },
         { chunk = "Edited." },
       },
+    },
+  },
+
+  reports_usage = {
+    turns = {
+      { { usage = { used = 42000, size = 200000 } }, { chunk = "Done." } },
     },
   },
 

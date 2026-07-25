@@ -43,6 +43,14 @@ notification (see |acp-options|), and `require("acp").statusline()` gives
 you a summary for your statusline. Inside the transcript, a tool call the
 agent has not finished yet carries that same spinner next to its title.
 
+                                                             *acp-context*
+The chat winbar carries a context counter, e.g. `◔ 21%`: how full the
+model's context window is, straight from the agent (ACP `usage_update`).
+The glyph fills as the window does — `○ ◔ ◑ ◕ ●` — so a glance tells you
+whether you are near a compaction. It appears once the agent reports a
+figure, usually at the end of the first turn, and agents that never report
+one simply have no counter.
+
 Threads, layouts, and conversations survive restarts (|acp-options|
 `persist`).
 
