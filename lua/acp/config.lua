@@ -97,6 +97,7 @@ M.defaults = {
     threads = "<leader>ct", -- focus the threads sidebar
     selection = "<leader>cs", -- (visual) send the selection as a context chip
     diagnostic = "<leader>cd", -- send the diagnostic under the cursor
+    follow = "<leader>cf", -- reveal the agent's edits in this window
   },
 
   -- vim.notify when a background thread needs attention / finishes.

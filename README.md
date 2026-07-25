@@ -42,7 +42,8 @@ failed. Background threads that need attention also fire a notification, and
       the chat winbar
 - [x] Subagent panel (`gs`): what the agent delegated, with status and
       runtime; running count in the chat winbar
-- [x] Follow mode: jump to where the agent is working (`gf`)
+- [x] Follow mode: jump to where the agent is working (`gf`), pinned to the
+      window you pick with `<leader>cf`
 - [x] Persistence: threads, layouts, and conversations survive restarts
 - [x] Auto-titled threads, in-editor authentication
 
@@ -72,6 +73,7 @@ Run `:checkhealth acp` after installing.
 | `:Acp`             | Open the last active thread, or create one if none exist |
 | `:AcpNew [name]`   | Create a thread: pick the agent, then the workspace (main checkout, any worktree, or a new named worktree) |
 | `:AcpToggleChat`   | Show or hide the chat column                          |
+| `:AcpFollow`       | Reveal the agent's edits in the current window (toggles) |
 | `:AcpInterrupt`    | Interrupt the current thread's turn                   |
 | `:checkhealth acp` | Verify agents, git, and Neovim setup                  |
 
@@ -79,7 +81,8 @@ Run `:checkhealth acp` after installing.
 
 Global: `<leader>cc` focus chat, `<leader>ct` focus sidebar, `<leader>cs`
 (visual) attach the selection to the chat as a context chip, `<leader>cd`
-attach the diagnostic under the cursor.
+attach the diagnostic under the cursor, `<leader>cf` follow the agent in
+this window.
 
 Sidebar: `Enter` open, `n` new (inside a workspace section, the new thread
 uses that workspace), `N` new thread in a brand-new worktree (names the
@@ -103,6 +106,13 @@ Agents that plan their work send their steps as they go. They land in the
 transcript, but scroll away; `gp` opens the latest plan in a float (`○` not
 started, `◐` in progress, `✓` done, `q` closes), and the chat winbar carries
 the step count as `▤ 2/5` while a plan is live.
+
+With follow mode on, the code area jumps to whatever file and line the agent
+touches. `<leader>cf` marks the window you run it in as the target, so the
+agent works in that one — a scratch split, say — while the rest of your
+layout is left alone. The marked window says `⟳ following claude` in its
+winbar; `gf` in the chat pauses and resumes without losing the mark. Both
+the mark and the on/off state are saved with the thread.
 
 Work an agent delegates arrives as an ordinary tool call — ACP has no notion
 of a subagent — so acp.nvim recognises them by title (`subagent_patterns`,
@@ -152,6 +162,7 @@ require("acp").setup({
     threads = "<leader>ct",
     selection = "<leader>cs", -- (visual) attach the selection as a chip
     diagnostic = "<leader>cd", -- attach the diagnostic under the cursor
+    follow = "<leader>cf",     -- follow the agent in this window
   },
   notify = true,
 })

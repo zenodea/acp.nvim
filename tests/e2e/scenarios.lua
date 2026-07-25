@@ -66,6 +66,25 @@ return {
     },
   },
 
+  -- Reports a location, so follow mode has somewhere to jump. README.md is
+  -- relative to the thread cwd, which the harness points at the repo root.
+  follow_edit = {
+    turns = {
+      {
+        {
+          tool_call = {
+            toolCallId = "t1",
+            title = "Edit README.md",
+            kind = "edit",
+            status = "completed",
+            locations = { { path = "README.md", line = 3 } },
+          },
+        },
+        { chunk = "Edited." },
+      },
+    },
+  },
+
   permission = {
     turns = {
       {

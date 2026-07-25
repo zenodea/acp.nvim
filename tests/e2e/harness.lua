@@ -137,6 +137,18 @@ function H.win(thread, role)
   return win
 end
 
+---First ordinary (non-plugin, non-float) window of a thread's tab.
+---@param thread table
+---@return integer
+function H.code_win(thread)
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(thread.tabpage)) do
+    if not vim.w[win].acp_ui and vim.api.nvim_win_get_config(win).relative == "" then
+      return win
+    end
+  end
+  error("no code window in the thread tab")
+end
+
 ---Tear down a thread completely so tests cannot leak into each other.
 ---@param thread table
 function H.stop(thread)

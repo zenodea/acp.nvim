@@ -15,6 +15,10 @@ vim.api.nvim_create_user_command("AcpToggleChat", function()
   require("acp").toggle_chat()
 end, { desc = "Show/hide the chat column of the current thread" })
 
+vim.api.nvim_create_user_command("AcpFollow", function()
+  require("acp").follow_here()
+end, { desc = "Reveal the agent's edits in the current window (toggles)" })
+
 vim.api.nvim_create_user_command("AcpInterrupt", function()
   require("acp").interrupt()
 end, { desc = "Interrupt the current thread's turn" })

@@ -14,10 +14,11 @@ CONTENTS                                                        *acp-contents*
   6. The prompt queue ..................... |acp-queue|
   7. The plan panel ....................... |acp-plan|
   8. Subagents ............................ |acp-subagents|
-  9. Options .............................. |acp-options|
- 10. Statusline ........................... |acp-statusline|
- 11. Highlights ........................... |acp-highlights|
- 12. Health ............................... |acp-health|
+  9. Follow mode .......................... |acp-follow|
+ 10. Options .............................. |acp-options|
+ 11. Statusline ........................... |acp-statusline|
+ 12. Highlights ........................... |acp-highlights|
+ 13. Health ............................... |acp-health|
 
 ==============================================================================
 1. INTRODUCTION                                             *acp-introduction*
@@ -90,6 +91,11 @@ Or directly: >lua
 :AcpToggleChat  Show or hide the chat column (chat + input windows) of the
                 current thread tab.
 
+                                                                  *:AcpFollow*
+:AcpFollow      Mark the current window as the one the agent's edits are
+                revealed in, and turn follow on. Run it again in that
+                window to turn follow off. See |acp-follow|.
+
                                                                *:AcpInterrupt*
 :AcpInterrupt   Interrupt the current thread's turn.
 
@@ -104,6 +110,7 @@ Global (configurable via the `keymaps` option, set to `false` to disable):
                 chip like `(file.lua 10-24)` — expanded at send time
   <leader>cd    Attach the diagnostic(s) on the current line, with a chip
                 pointing at the offending line
+  <leader>cf    Follow the agent in this window, see |acp-follow|
 
 Sidebar:
 
@@ -210,7 +217,36 @@ If your agent names its delegation tool something else, add a pattern: >lua
   })
 <
 ==============================================================================
-9. OPTIONS                                                       *acp-options*
+9. FOLLOW MODE                                                    *acp-follow*
+
+With follow on, the code area jumps to whatever file and line the agent
+reports touching, so you watch the work happen instead of chasing it.
+
+By default the edits land in the first code window of the thread's tab,
+which is rarely what you want once you have split it. `<leader>cf`
+(|:AcpFollow|) marks the window you run it in as the target: from then on
+every reveal goes there and the rest of your layout is left alone. Point it
+at a scratch window and the agent works in that one while you read your own
+file beside it.
+
+The marked window says so in its winbar (`⟳ following claude`), and gets its
+own winbar back when unmarked. Only one window per tab can be marked;
+marking another moves the mark.
+
+`<leader>cf` also turns follow on, and running it again in the marked window
+turns it off. `gf` in the chat toggles follow without touching the mark — a
+marked window that is paused reads `⟳ follow paused (gf)`.
+
+Which window is marked is saved with the thread's layout, and whether follow
+is on is saved with the thread, so both survive reopening a thread and
+restarting Neovim. `ui.follow` (|acp-options|) sets the default for threads
+that have never been toggled.
+
+Following only happens while you are looking at that thread's tab; a
+background thread never yanks your windows around.
+
+==============================================================================
+10. OPTIONS                                                      *acp-options*
 
 Defaults: >lua
 
@@ -274,7 +310,8 @@ Defaults: >lua
       -- always win.
       auto_title = true,
       -- Follow the agent: jump the code window to tool-call locations as
-      -- it works. Toggle per thread with `gf`.
+      -- it works. Default for new threads; toggle per thread with `gf`,
+      -- and pick the target window with <leader>cf (|acp-follow|).
       follow = false,
       icons = {
         working = "●",
@@ -315,6 +352,7 @@ Defaults: >lua
       threads = "<leader>ct",
       selection = "<leader>cs",  -- (visual) attach selection as a chip
       diagnostic = "<leader>cd", -- attach diagnostic under the cursor
+      follow = "<leader>cf",     -- follow the agent in this window
     },
 
     -- vim.notify when a background thread needs attention / finishes.
@@ -322,7 +360,7 @@ Defaults: >lua
   })
 <
 ==============================================================================
-10. STATUSLINE                                                *acp-statusline*
+11. STATUSLINE                                                *acp-statusline*
 
 `require("acp").statusline()` returns a compact summary such as `●2 ?1`
 (two threads working, one needing attention), or an empty string when there
@@ -331,7 +369,7 @@ are no threads. Example for a custom statusline: >lua
   vim.o.statusline = "%f %= %{v:lua.require'acp'.statusline()} "
 <
 ==============================================================================
-11. HIGHLIGHTS                                                *acp-highlights*
+12. HIGHLIGHTS                                                *acp-highlights*
 
 All groups are defined with `default = true` links and can be overridden:
 
@@ -358,7 +396,7 @@ All groups are defined with `default = true` links and can be overridden:
   AcpChip             context chips            -> Special
 
 ==============================================================================
-12. HEALTH                                                        *acp-health*
+13. HEALTH                                                        *acp-health*
 
 `:checkhealth acp` verifies the Neovim version, the configured agent
 commands, git (for worktrees), and Node.js availability.

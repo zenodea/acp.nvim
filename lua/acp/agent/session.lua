@@ -783,10 +783,7 @@ end
 
 ---@return boolean
 function Session:follow_enabled()
-  if self.thread.follow ~= nil then
-    return self.thread.follow
-  end
-  return require("acp.config").options.ui.follow
+  return self.thread:follow_enabled()
 end
 
 ---Jump the code window to where the agent is working (tool-call locations),
