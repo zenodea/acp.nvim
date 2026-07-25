@@ -148,6 +148,37 @@ T.interrupt_marks_turn_interrupted = H.test("cancel_me", function(thread)
   eq("idle", thread.status)
 end)
 
+-- One case per window: <Esc> in normal mode stops the turn from wherever
+-- you happen to be sitting.
+for _, role in ipairs({ "chat", "input" }) do
+  T["esc_in_the_" .. role .. "_interrupts"] = H.test("cancel_me", function(thread)
+    H.send(thread, "go")
+    H.wait_for(function()
+      return H.chat_has(thread, "working...")
+    end, "turn started")
+    H.feed(H.win(thread, role), "<Esc>")
+    H.wait_done(thread)
+    eq(true, H.chat_has(thread, "── interrupted"), "interrupted meta")
+    eq("idle", thread.status)
+  end)
+end
+
+T.esc_while_typing_only_leaves_insert_mode = H.test("cancel_me", function(thread)
+  H.send(thread, "go")
+  H.wait_for(function()
+    return H.chat_has(thread, "working...")
+  end, "turn started")
+  local win = H.win(thread, "input")
+  vim.api.nvim_set_current_win(win)
+  -- Esc out of insert mode must not stop the agent mid-thought.
+  H.feed(win, "ihalf a message<Esc>")
+  eq("n", vim.api.nvim_get_mode().mode, "back in normal mode")
+  eq(true, thread.session.busy, "turn still running")
+  eq({ "half a message" }, vim.api.nvim_buf_get_lines(thread.input_buf, 0, -1, false), "text kept")
+  thread.session:interrupt()
+  H.wait_done(thread)
+end)
+
 T.queue_while_busy = H.test("permission", function(thread)
   H.send(thread, "first")
   H.wait_for(function()

@@ -120,6 +120,8 @@ Chat input:
   <CR>          Send the message (insert or normal mode)
   <C-j>         Insert a newline
   <C-c>         Interrupt the agent
+  <Esc>         Interrupt the agent (normal mode; in insert mode it just
+                leaves insert mode as usual)
   <C-p> <C-n>   Prompt history
   gm            Session config picker (mode / model)
   gq            Edit the queued prompts, see |acp-queue|
@@ -139,7 +141,7 @@ Chat transcript:
                 Requires a terminal that distinguishes Shift-Enter from
                 Enter (kitty, WezTerm, Ghostty, iTerm2 with CSI u).
   i             Focus the message input
-  <C-c>         Interrupt the agent
+  <C-c> <Esc>   Interrupt the agent
   gd            Jump to the code location of the tool call under the
                 cursor (agents report the file/line they touched)
   gm gq gp gs gf

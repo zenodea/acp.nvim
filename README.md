@@ -86,7 +86,8 @@ worktree, then the thread), `d` delete, `r` rename.
 
 Chat input: `Enter` send, `Ctrl-j` newline, `Ctrl-c` interrupt, `Ctrl-p`/`Ctrl-n`
 history, `gm` config, `gq` edit queued prompts, `gp` plan, `gs` subagents,
-`gf` follow, `/` commands, `y`/`a`/`n` permissions.
+`gf` follow, `/` commands, `y`/`a`/`n` permissions. `Esc` in normal mode
+interrupts too, in both the input and the transcript.
 
 Chat transcript: `Enter` expand/collapse an entry, `Shift-Enter` open a tool
 call's full content in a float (`q` closes), `gd` jump to the code a tool
