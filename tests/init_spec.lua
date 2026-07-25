@@ -99,7 +99,7 @@ function T.new_worktree_names_the_worktree_then_the_thread()
 
   eq("Worktree name: ", prompts[1].prompt)
   eq("Thread name: ", prompts[2].prompt)
-  eq("Flaky Tests", prompts[2].default, "thread name defaults to the worktree name")
+  eq(nil, prompts[2].default, "thread name starts empty, not pre-filled with the worktree name")
   eq("flaky-tests", created_name, "worktree slugified from its own prompt")
   local t = registry.threads[#registry.threads]
   eq("hunt the flakes", t.name, "thread keeps the name you gave it")

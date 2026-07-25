@@ -126,8 +126,7 @@ Sidebar:
   n             New thread; inside a workspace section, the thread is
                 created in that section's workspace
   N             New thread in a brand-new git worktree: asks for the
-                worktree name, then the thread name (defaulting to the
-                same), then the agent
+                worktree name, then the thread name, then the agent
   d             Delete the thread under the cursor
   r             Rename the thread under the cursor
 
