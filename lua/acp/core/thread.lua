@@ -18,6 +18,7 @@ local util = require("acp.util")
 ---@field worktree {path: string, branch: string}|nil
 ---@field session_id string|nil    -- ACP session id, for session/load and resume
 ---@field transcript TranscriptEntry[]
+---@field follow boolean|nil     -- reveal the agent's edits (nil = ui.follow)
 ---@field plan table[]|nil         -- latest ACP plan entries (see acp.ui.plan)
 ---@field layout table|nil         -- serialized code-area layout
 ---@field created_at integer
@@ -67,6 +68,7 @@ function Thread.from_state(data)
   self.worktree = data.worktree
   self.session_id = data.session_id
   self.transcript = data.transcript or {}
+  self.follow = data.follow
   self.plan = data.plan
   self.layout = data.layout
   self.created_at = data.created_at or os.time()
@@ -94,6 +96,7 @@ function Thread:to_state()
     worktree = self.worktree,
     session_id = self.session_id,
     transcript = transcript,
+    follow = self.follow,
     plan = self.plan,
     layout = self.layout,
     created_at = self.created_at,
@@ -115,11 +118,20 @@ function Thread:set_status(status, detail)
   require("acp.core.registry").emit("status", self, old, old_detail)
 end
 
----@return boolean
 ---Effective agent name (the thread's own, or the configured default).
 ---@return string
 function Thread:agent_name()
   return self.agent or require("acp.config").options.default_agent
+end
+
+---Whether the agent's edits are revealed as it works (the thread's own
+---setting, or the configured default).
+---@return boolean
+function Thread:follow_enabled()
+  if self.follow ~= nil then
+    return self.follow
+  end
+  return require("acp.config").options.ui.follow
 end
 
 function Thread:tab_valid()

@@ -97,18 +97,93 @@ local function build_tab(thread)
   vim.api.nvim_set_current_win(code_win)
   M.build_sidebar()
   M.build_chat_column(thread)
+  -- The restored layout may have brought a follow mark back with it.
+  M.update_follow_winbar(thread)
   vim.api.nvim_set_current_win(code_win)
 end
 
----First non-plugin window of a tab (the code area).
+---@param win integer
+---@return boolean
+local function is_code_win(win)
+  return not vim.w[win].acp_ui and vim.api.nvim_win_get_config(win).relative == ""
+end
+
+---The code window a thread reveals files into: the one explicitly marked to
+---follow the agent, else the first ordinary window of the tab. Floats (the
+---plan panel, a tool-call detail) are never candidates.
 ---@param tabpage integer
 ---@return integer|nil
 local function find_code_win(tabpage)
+  local first
   for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
-    if not vim.w[win].acp_ui then
-      return win
+    if is_code_win(win) then
+      if vim.w[win].acp_follow then
+        return win
+      end
+      first = first or win
     end
   end
+  return first
+end
+
+---@param win integer
+local function unmark_follow(win)
+  if not vim.api.nvim_win_is_valid(win) then
+    return
+  end
+  vim.w[win].acp_follow = nil
+  -- Restore whatever winbar the window carried before it was marked.
+  vim.wo[win].winbar = vim.w[win].acp_follow_winbar or ""
+  vim.w[win].acp_follow_winbar = nil
+end
+
+---Repaint the marked window's winbar: follow can also be toggled from the
+---chat with gf, and a paused target must not claim to be following.
+---@param thread Thread
+function M.update_follow_winbar(thread)
+  if not thread:tab_valid() then
+    return
+  end
+  local on = thread:follow_enabled()
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(thread.tabpage)) do
+    if vim.w[win].acp_follow then
+      vim.wo[win].winbar = on and (" ⟳ following " .. thread:agent_name()) or " ⟳ follow paused (gf)"
+    end
+  end
+end
+
+---Mark the current window as where the agent's edits are revealed, and turn
+---follow on. Repeating it in the marked window clears the mark and turns
+---follow off, so one key covers both directions.
+---@param thread Thread
+function M.follow_here(thread)
+  local win = vim.api.nvim_get_current_win()
+  if not is_code_win(win) then
+    vim.notify("acp: run this in a code window, not a plugin window", vim.log.levels.WARN)
+    return
+  end
+  if not thread:tab_valid() or vim.api.nvim_win_get_tabpage(win) ~= thread.tabpage then
+    vim.notify("acp: this window is not in " .. thread.name .. "'s tab", vim.log.levels.WARN)
+    return
+  end
+  if vim.w[win].acp_follow then
+    unmark_follow(win)
+    thread.follow = false
+    vim.notify("acp: follow mode off")
+    return
+  end
+  -- One target per tab: the agent reveals into a single window.
+  for _, other in ipairs(vim.api.nvim_tabpage_list_wins(thread.tabpage)) do
+    if vim.w[other].acp_follow then
+      unmark_follow(other)
+    end
+  end
+  vim.w[win].acp_follow_winbar = vim.wo[win].winbar
+  vim.w[win].acp_follow = true
+  thread.follow = true
+  M.update_follow_winbar(thread)
+  require("acp.persist.store").save_debounced()
+  vim.notify("acp: following " .. thread:agent_name() .. " in this window")
 end
 
 ---Show a file (and line) in the thread's code window without stealing focus.

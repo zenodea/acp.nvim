@@ -15,10 +15,13 @@ local function capture_node(node)
     end
     local name = vim.api.nvim_buf_get_name(buf)
     local cursor = vim.api.nvim_win_get_cursor(win)
+    -- Which window follows the agent is part of the layout, so reopening a
+    -- thread puts the mark back where you left it.
+    local follow = vim.w[win].acp_follow and true or nil
     if name == "" then
-      return { type = "leaf" } -- empty window: keep the slot, no file
+      return { type = "leaf", follow = follow } -- empty window: keep the slot
     end
-    return { type = "leaf", file = name, cursor = cursor }
+    return { type = "leaf", file = name, cursor = cursor, follow = follow }
   else -- "row" | "col"
     local children = {}
     for _, child in ipairs(node[2]) do
@@ -57,6 +60,10 @@ local function restore_node(node)
       if node.cursor then
         pcall(vim.api.nvim_win_set_cursor, 0, node.cursor)
       end
+    end
+    -- The winbar is painted by acp.ui.workspace once the tab is built.
+    if node.follow then
+      vim.w[vim.api.nvim_get_current_win()].acp_follow = true
     end
     return
   end

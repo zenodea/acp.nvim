@@ -182,6 +182,11 @@ function M.setup(opts)
       M.add_diagnostic()
     end, { desc = "ACP: attach diagnostic to the chat" })
   end
+  if keymaps.follow then
+    vim.keymap.set("n", keymaps.follow, function()
+      M.follow_here()
+    end, { desc = "ACP: follow the agent in this window" })
+  end
 end
 
 local function ensure_setup()
@@ -501,6 +506,20 @@ function M.focus_threads()
   if win then
     vim.api.nvim_set_current_win(win)
   end
+end
+
+---Mark the current window as the one the agent's edits are revealed in
+---(and turn follow on); repeating it there turns follow back off.
+function M.follow_here()
+  ensure_setup()
+  -- Marking only means something inside the thread's own tab, so this never
+  -- falls back to the last active thread the way focus_chat does.
+  local thread = registry().find_by_tab(vim.api.nvim_get_current_tabpage())
+  if not thread then
+    vim.notify("acp: current tab is not a thread workspace", vim.log.levels.WARN)
+    return
+  end
+  workspace().follow_here(thread)
 end
 
 ---Interrupt the thread of the current tab.

@@ -137,6 +137,28 @@ T.subagent_spawns_are_tracked_and_listed = H.test("delegating", function(thread)
   H.feed(0, "q")
 end)
 
+T.agent_edits_land_in_the_marked_window = H.test("follow_edit", function(thread)
+  -- Split the code area, then mark the original half as the follow target.
+  local marked = H.code_win(thread)
+  vim.api.nvim_set_current_win(marked)
+  vim.cmd("split")
+  local other = vim.api.nvim_get_current_win()
+  local untouched = vim.api.nvim_win_get_buf(other)
+  vim.api.nvim_set_current_win(marked)
+
+  require("acp").follow_here()
+  eq(true, thread.follow, "marking turned follow on")
+  eq(true, vim.wo[marked].winbar:find("following", 1, true) ~= nil, "winbar: " .. vim.wo[marked].winbar)
+
+  H.send(thread, "edit the readme")
+  H.wait_done(thread)
+
+  local shown = vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(marked))
+  eq(true, shown:find("README.md", 1, true) ~= nil, "marked window shows the edited file: " .. shown)
+  eq(3, vim.api.nvim_win_get_cursor(marked)[1], "cursor on the reported line")
+  eq(untouched, vim.api.nvim_win_get_buf(other), "the other code window kept its buffer")
+end)
+
 T.in_flight_tool_call_shows_a_spinner = H.test("slow_tool", function(thread)
   local ns = vim.api.nvim_get_namespaces()["acp-chat-spin"]
   local function glyphs()
