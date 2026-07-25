@@ -84,17 +84,23 @@ local function diff_lines(old, new, context)
   return out
 end
 
----Lines for a tool call's content items (diffs).
+---Lines for a tool call's content items (diffs, terminal output).
+---
+---Diffs render in full: a tool call shows only its title until you expand
+---it, and expanding it means you want to read the change. Terminal output
+---is the exception — it is unbounded, still growing, and re-rendered every
+---time a chunk lands — so only its last few lines stay
+---inline (`ui.terminal_max_lines`). `full` lifts that too, for the float.
 ---@param content table[]|nil
----@param max integer|nil line cap; overrides ui.diff_max_lines and, when
----given, renders even if ui.show_diffs is off (detail view)
+---@param full boolean|nil render everything, even when ui.show_diffs is off
 ---@return string[]
-function M.tool_content_lines(content, max)
+function M.tool_content_lines(content, full)
   local cfg = require("acp.config").options.ui
-  if type(content) ~= "table" or (max == nil and not cfg.show_diffs) then
+  if type(content) ~= "table" or not (full or cfg.show_diffs) then
     return {}
   end
-  max = max or cfg.diff_max_lines
+  -- diff_max_lines is the option's former name, still honoured.
+  local tail = full and math.huge or (cfg.terminal_max_lines or cfg.diff_max_lines or 24)
   local lines = {}
   local function push(prefix, text)
     for _, l in ipairs(util.lines(text or "")) do
@@ -105,18 +111,13 @@ function M.tool_content_lines(content, max)
     if item.type == "diff" then
       vim.list_extend(lines, diff_lines(item.oldText, item.newText, cfg.diff_context or 3))
     elseif item.type == "terminal" and item.terminalId then
-      vim.list_extend(lines, require("acp.agent.terminal").render_lines(item.terminalId, max))
+      vim.list_extend(lines, require("acp.agent.terminal").render_lines(item.terminalId, tail))
     elseif item.type == "content" then
       local text = M.content_text(item.content)
       if text ~= "" then
         push("  ", text)
       end
     end
-  end
-  if #lines > max then
-    local total = #lines
-    lines = vim.list_slice(lines, 1, max)
-    table.insert(lines, string.format("… (%d more lines)", total - max))
   end
   return lines
 end

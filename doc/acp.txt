@@ -151,7 +151,8 @@ Chat input:
 
 Chat transcript:
 
-  <CR>          Expand or collapse the entry under the cursor
+  <CR>          Expand or collapse the entry under the cursor. Expanding
+                a tool call shows its whole diff, however long
   <S-CR>        Open the tool call's full, untruncated content (diffs,
                 terminal output) in a float; `q` or `:q` closes it.
                 Requires a terminal that distinguishes Shift-Enter from
@@ -311,7 +312,10 @@ Defaults: >lua
       focus_on_open = "keep",
       show_thinking = true,      -- render agent thought chunks (dimmed)
       show_diffs = true,         -- render diffs from tool-call content
-      diff_max_lines = 24,       -- truncate rendered diffs beyond this
+      -- Lines of terminal output kept inline under a tool call (its
+      -- tail). Diffs are never truncated: expanding a tool call shows
+      -- the whole change. <S-CR> lifts this too.
+      terminal_max_lines = 24,
       diff_context = 3,          -- context lines around each diff hunk
       show_result_meta = true,   -- "── done · 12s" line after each turn
       -- Rename threads from the agent's session title; manual renames

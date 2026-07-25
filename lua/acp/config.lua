@@ -48,7 +48,10 @@ M.defaults = {
     focus_on_open = "keep",
     show_thinking = true, -- render agent thought chunks (dimmed)
     show_diffs = true, -- render diffs from tool-call content
-    diff_max_lines = 24, -- truncate rendered diffs beyond this
+    -- Lines of terminal output kept inline under a tool call (its tail;
+    -- S-CR shows the whole thing). Diffs are never truncated: expanding a
+    -- tool call shows the entire change.
+    terminal_max_lines = 24,
     diff_context = 3, -- unchanged context lines kept around each diff hunk
     show_result_meta = true, -- "── done · 12s" line after each turn
     -- Rename threads from the agent's session title (session_info_update);
