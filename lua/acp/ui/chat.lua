@@ -121,9 +121,24 @@ end
 ---in step rather than each on its own phase.
 local frame = require("acp.util").spinner[1]
 
----Redraw the spinner next to every tool call still in flight. Virtual text,
----not buffer text: it costs one extmark per tick instead of re-rendering the
----entry, and never shifts the transcript around.
+---The spinner frame padded to the display width of entry `index`'s tool
+---icon, so overlaying it swaps the icon for the spinner without shifting
+---the title.
+---@param s table chat state
+---@param index integer
+---@return string
+local function spinner_text(s, index)
+  local icons = require("acp.config").options.ui.icons
+  local entry = s.thread and s.thread.transcript[index]
+  local prefix = (entry and (icons.tool_kinds or {})[entry.tool]) or icons.tool
+  local width = vim.fn.strdisplaywidth(icon_prefix(prefix))
+  return frame .. string.rep(" ", math.max(width - 1, 1))
+end
+
+---Redraw the spinner of every tool call still in flight, in place of its
+---tool icon. An overlay extmark, not buffer text: it costs one extmark per
+---tick instead of re-rendering the entry, and deleting it uncovers the real
+---icon untouched underneath.
 ---@type {start: fun(), stop: fun()}
 local spin -- declared first: the tick callback stops the timer it belongs to
 spin = require("acp.util").spinner_timer(function(f)
@@ -140,8 +155,8 @@ spin = require("acp.util").spinner_timer(function(f)
           -- a collapsed tool call keeps its title as the only visible one.
           pcall(vim.api.nvim_buf_set_extmark, buf, ns_spin, range.start + 1, 0, {
             id = index,
-            virt_text = { { " " .. frame, "AcpChatTool" } },
-            virt_text_pos = "eol",
+            virt_text = { { spinner_text(s, index), "AcpChatTool" } },
+            virt_text_pos = "overlay",
           })
         end
       end
