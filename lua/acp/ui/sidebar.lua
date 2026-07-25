@@ -87,6 +87,9 @@ function M.ensure_buf()
     -- Creating from inside a group targets that group's workspace.
     api().new(nil, { workspace = M.workspace_at_cursor() })
   end, "New thread")
+  map("N", function()
+    api().new_worktree()
+  end, "New thread in a new worktree")
   map("d", function()
     local t = thread_at_cursor()
     if t then
@@ -212,7 +215,7 @@ function M.render()
   if lines[#lines] ~= "" then
     table.insert(lines, "")
   end
-  vim.list_extend(lines, { " n new · ⏎ open", " d delete · r rename" })
+  vim.list_extend(lines, { " n new · N new in worktree", " ⏎ open · d delete · r rename" })
   table.insert(marks, { #lines - 2, "AcpSidebarHint" })
   table.insert(marks, { #lines - 1, "AcpSidebarHint" })
 

@@ -81,7 +81,8 @@ Global: `<leader>cc` focus chat, `<leader>ct` focus sidebar, `<leader>cs`
 attach the diagnostic under the cursor.
 
 Sidebar: `Enter` open, `n` new (inside a workspace section, the new thread
-uses that workspace), `d` delete, `r` rename.
+uses that workspace), `N` new thread in a brand-new worktree (names the
+worktree, then the thread), `d` delete, `r` rename.
 
 Chat input: `Enter` send, `Ctrl-j` newline, `Ctrl-c` interrupt, `Ctrl-p`/`Ctrl-n`
 history, `gm` config, `gq` edit queued prompts, `gp` plan, `gs` subagents,
