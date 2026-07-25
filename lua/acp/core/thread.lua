@@ -18,6 +18,7 @@ local util = require("acp.util")
 ---@field worktree {path: string, branch: string}|nil
 ---@field session_id string|nil    -- ACP session id, for session/load and resume
 ---@field transcript TranscriptEntry[]
+---@field plan table[]|nil         -- latest ACP plan entries (see acp.ui.plan)
 ---@field layout table|nil         -- serialized code-area layout
 ---@field created_at integer
 ---@field last_active integer
@@ -65,6 +66,7 @@ function Thread.from_state(data)
   self.worktree = data.worktree
   self.session_id = data.session_id
   self.transcript = data.transcript or {}
+  self.plan = data.plan
   self.layout = data.layout
   self.created_at = data.created_at or os.time()
   self.last_active = data.last_active or os.time()
@@ -91,6 +93,7 @@ function Thread:to_state()
     worktree = self.worktree,
     session_id = self.session_id,
     transcript = transcript,
+    plan = self.plan,
     layout = self.layout,
     created_at = self.created_at,
     last_active = self.last_active,

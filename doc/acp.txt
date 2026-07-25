@@ -12,10 +12,11 @@ CONTENTS                                                        *acp-contents*
   4. Commands ............................. |acp-commands|
   5. Keymaps .............................. |acp-keymaps|
   6. The prompt queue ..................... |acp-queue|
-  7. Options .............................. |acp-options|
-  8. Statusline ........................... |acp-statusline|
-  9. Highlights ........................... |acp-highlights|
- 10. Health ............................... |acp-health|
+  7. The plan panel ....................... |acp-plan|
+  8. Options .............................. |acp-options|
+  9. Statusline ........................... |acp-statusline|
+ 10. Highlights ........................... |acp-highlights|
+ 11. Health ............................... |acp-health|
 
 ==============================================================================
 1. INTRODUCTION                                             *acp-introduction*
@@ -118,6 +119,7 @@ Chat input:
   <C-p> <C-n>   Prompt history
   gm            Session config picker (mode / model)
   gq            Edit the queued prompts, see |acp-queue|
+  gp            Show the plan the agent is working from, see |acp-plan|
   gf            Toggle follow mode (jump to where the agent works)
   /             Agent slash commands (at the start of the input)
   @             Complete project files into whole-file context chips
@@ -134,7 +136,7 @@ Chat transcript:
   <C-c>         Interrupt the agent
   gd            Jump to the code location of the tool call under the
                 cursor (agents report the file/line they touched)
-  gm gq gf      As in the input window
+  gm gq gp gf   As in the input window
 
 The transcript cursor only rests on content lines; blank separator lines
 are skipped in the direction of movement.
@@ -153,7 +155,24 @@ the editor is open are not re-queued when it closes (unless you edited
 them, in which case your edited version stays queued).
 
 ==============================================================================
-7. OPTIONS                                                       *acp-options*
+7. THE PLAN PANEL                                                   *acp-plan*
+
+Agents that plan their work announce the steps and keep their status up to
+date as they go. Each update lands in the transcript, where the step in
+progress is accented and finished steps are checked off — but it scrolls
+away as the turn continues.
+
+`gp` opens the latest plan in a float instead, so it is one keypress away
+wherever you are in the conversation. Steps read `○` not started, `◐` in
+progress, `✓` done; `q` or `:q` closes the panel.
+
+While a plan is live, the chat winbar carries its step count, e.g. `▤ 2/5`.
+The plan is saved with the thread, so it is still there after a restart.
+
+Agents that never send a plan simply have none, and `gp` says so.
+
+==============================================================================
+8. OPTIONS                                                       *acp-options*
 
 Defaults: >lua
 
@@ -258,7 +277,7 @@ Defaults: >lua
   })
 <
 ==============================================================================
-8. STATUSLINE                                                 *acp-statusline*
+9. STATUSLINE                                                 *acp-statusline*
 
 `require("acp").statusline()` returns a compact summary such as `●2 ?1`
 (two threads working, one needing attention), or an empty string when there
@@ -267,7 +286,7 @@ are no threads. Example for a custom statusline: >lua
   vim.o.statusline = "%f %= %{v:lua.require'acp'.statusline()} "
 <
 ==============================================================================
-9. HIGHLIGHTS                                                 *acp-highlights*
+10. HIGHLIGHTS                                                *acp-highlights*
 
 All groups are defined with `default = true` links and can be overridden:
 
@@ -294,7 +313,7 @@ All groups are defined with `default = true` links and can be overridden:
   AcpChip             context chips            -> Special
 
 ==============================================================================
-10. HEALTH                                                        *acp-health*
+11. HEALTH                                                        *acp-health*
 
 `:checkhealth acp` verifies the Neovim version, the configured agent
 commands, git (for worktrees), and Node.js availability.

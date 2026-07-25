@@ -134,7 +134,7 @@ function M.reveal(thread, path, line)
   return win
 end
 
----Refresh the chat winbar: "name · agent [mode]".
+---Refresh the chat winbar: "name · agent [mode]  ▤ 2/5".
 ---@param thread Thread
 function M.update_winbar(thread)
   if not thread:tab_valid() then
@@ -162,6 +162,12 @@ function M.update_winbar(thread)
   end
   if #badges > 0 then
     text = text .. " [" .. table.concat(badges, " · ") .. "]"
+  end
+  -- Plan progress rides outside the brackets: those hold what the session is
+  -- configured as, this is what it is doing.
+  local done, total = require("acp.ui.plan").progress(thread)
+  if total > 0 then
+    text = text .. ("  ▤ %d/%d"):format(done, total)
   end
   if session and session.starting then
     text = text .. "  " .. (session.spinner or "…") .. " starting"

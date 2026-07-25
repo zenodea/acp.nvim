@@ -37,6 +37,8 @@ failed. Background threads that need attention also fire a notification, and
 - [x] Favourite model per agent: the last model you pick becomes the default
 - [x] Sessions autostart when a thread is opened (spinner while booting)
 - [x] Prompt queue shown in the input winbar, editable with `gq`
+- [x] Plan panel (`gp`): the agent's current plan on demand, step count in
+      the chat winbar
 - [x] Follow mode: jump to where the agent is working (`gf`)
 - [x] Persistence: threads, layouts, and conversations survive restarts
 - [x] Auto-titled threads, in-editor authentication
@@ -80,8 +82,8 @@ Sidebar: `Enter` open, `n` new (inside a workspace section, the new thread
 uses that workspace), `d` delete, `r` rename.
 
 Chat input: `Enter` send, `Ctrl-j` newline, `Ctrl-c` interrupt, `Ctrl-p`/`Ctrl-n`
-history, `gm` config, `gq` edit queued prompts, `gf` follow, `/` commands,
-`y`/`a`/`n` permissions.
+history, `gm` config, `gq` edit queued prompts, `gp` plan, `gf` follow, `/`
+commands, `y`/`a`/`n` permissions.
 
 Chat transcript: `Enter` expand/collapse an entry, `Shift-Enter` open a tool
 call's full content in a float (`q` closes), `gd` jump to the code a tool
@@ -91,6 +93,11 @@ Messages sent while the agent is working are queued; the input winbar shows
 the count. `gq` opens the queue as plain text in a floating buffer — edit,
 reorder, or delete the `─`-separated blocks like any text and close the
 window (or `:w`) to apply.
+
+Agents that plan their work send their steps as they go. They land in the
+transcript, but scroll away; `gp` opens the latest plan in a float (`○` not
+started, `◐` in progress, `✓` done, `q` closes), and the chat winbar carries
+the step count as `▤ 2/5` while a plan is live.
 
 ## Configuration
 
