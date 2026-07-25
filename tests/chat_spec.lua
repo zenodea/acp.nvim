@@ -194,23 +194,29 @@ local function tick()
   end)
 end
 
-function T.in_flight_tool_call_spins_next_to_its_title()
+function T.in_flight_tool_call_spins_in_place_of_its_icon()
   n = n + 1
   local thread = h.thread("chat-test-" .. n)
   local buf = chat.ensure_buf(thread)
   chat.append(thread, "tool", "Edit file.lua", "tc", "edit")
   chat.set_status(thread, "tc", "in_progress")
   tick()
-  -- Lines: 0 blank, 1 the title — the glyph rides at the end of line 1.
-  local marks = spinners(buf)
-  eq(1, vim.tbl_count(marks), "one spinner")
-  eq(true, vim.tbl_contains(require("acp.util").spinner, vim.trim(marks[1])), "a spinner frame: " .. tostring(marks[1]))
+  -- Lines: 0 blank, 1 the title — the spinner overlays the icon at col 0.
+  local ns = vim.api.nvim_get_namespaces()["acp-chat-spin"]
+  local marks = vim.api.nvim_buf_get_extmarks(buf, ns, 0, -1, { details = true })
+  eq(1, #marks, "one spinner")
+  eq({ 1, 0 }, { marks[1][2], marks[1][3] }, "on the title line, over the icon")
+  eq("overlay", marks[1][4].virt_text_pos, "covers the icon instead of trailing the title")
+  local text = marks[1][4].virt_text[1][1]
+  eq(true, vim.tbl_contains(require("acp.util").spinner, vim.trim(text)), "a spinner frame: " .. text)
+  -- Padded to the icon's width, so the title does not shift while spinning.
+  local icons = require("acp.config").options.ui.icons
+  eq(vim.fn.strdisplaywidth(icons.tool_kinds.edit), vim.fn.strdisplaywidth(text), "same width as the icon it covers")
   -- It animates rather than sitting on one frame.
-  local first = marks[1]
   vim.wait(600, function()
-    return spinners(buf)[1] ~= first
+    return spinners(buf)[1] ~= text
   end)
-  eq(true, spinners(buf)[1] ~= first, "frame advanced")
+  eq(true, spinners(buf)[1] ~= text, "frame advanced")
 end
 
 function T.spinner_stops_when_the_call_completes()

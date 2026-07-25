@@ -41,7 +41,8 @@ per thread: an animated spinner while working, `?` needs you, `✓` done,
 `✗` failed. Background threads that need attention also fire a
 notification (see |acp-options|), and `require("acp").statusline()` gives
 you a summary for your statusline. Inside the transcript, a tool call the
-agent has not finished yet carries that same spinner next to its title.
+agent has not finished yet spins in place of its tool icon; the icon
+returns when the call lands.
 
                                                              *acp-context*
 The chat winbar carries a context counter, e.g. `◔ 21%`: how full the
