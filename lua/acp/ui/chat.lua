@@ -533,7 +533,7 @@ function M.detail_at_cursor(thread)
       table.insert(lines, entry.loc.path .. (entry.loc.line and (":" .. entry.loc.line) or ""))
     end
     table.insert(lines, "")
-    vim.list_extend(lines, events.tool_content_lines(call.content, 100000))
+    vim.list_extend(lines, events.tool_content_lines(call.content, true))
   else
     -- No live call state (e.g. restored session): show the rendered text.
     lines = require("acp.util").lines(entry.text)

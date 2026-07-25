@@ -118,8 +118,7 @@ function T.detail_float_shows_untruncated_tool_content()
   for i = 1, 60 do
     big[i] = "line " .. i
   end
-  -- 60 added lines: far beyond diff_max_lines (24), so the chat shows a
-  -- truncated diff but the detail float must show everything.
+  -- The float renders straight from the live call, headed by its status.
   thread.session = {
     tool_calls = {
       tc = {
@@ -256,6 +255,61 @@ function T.completed_tool_call_never_spins()
   chat.set_status(thread, "unknown-id", "in_progress") -- ignored, not a crash
   tick()
   eq(0, vim.tbl_count(spinners(buf)))
+end
+
+function T.expanding_a_tool_call_shows_the_whole_diff()
+  n = n + 1
+  local thread = h.thread("chat-test-" .. n)
+  local buf = chat.ensure_buf(thread)
+  local big = {}
+  for i = 1, 300 do
+    big[i] = "line " .. i
+  end
+  local events = require("acp.agent.events")
+  local call = {
+    title = "Write big.lua",
+    kind = "edit",
+    status = "completed",
+    content = { { type = "diff", oldText = "", newText = table.concat(big, "\n") } },
+  }
+  chat.append(thread, "tool", events.tool_text(call), "tc", "edit")
+  -- Collapsed by default: one title line carrying the hidden-line count.
+  eq(2, vim.api.nvim_buf_line_count(buf), "collapsed to the title")
+  eq(true, vim.api.nvim_buf_get_lines(buf, 1, 2, false)[1]:find("▸ 300 more", 1, true) ~= nil)
+
+  chat.toggle_entry(thread, 1)
+  local shown = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  -- Blank separator + title + all 300 diff lines, nothing elided.
+  eq(302, #shown, "every diff line rendered")
+  eq("  + line 300", shown[302])
+  eq(nil, table.concat(shown, "\n"):find("more lines", 1, true), "no truncation marker")
+end
+
+function T.terminal_output_keeps_only_its_tail_inline()
+  n = n + 1
+  local thread = h.thread("chat-test-" .. n)
+  local events = require("acp.agent.events")
+  local terminal = require("acp.agent.terminal")
+  local id = terminal.create(
+    { command = "printf", args = { "a\\nb\\nc\\nd\\ne\\nf\\n" } },
+    vim.fn.getcwd(),
+    function() end
+  )
+  vim.wait(2000, function()
+    return #terminal.render_lines(id, 100) >= 7
+  end)
+  require("acp.config").options.ui.terminal_max_lines = 3
+
+  local lines = events.tool_content_lines({ { type = "terminal", terminalId = id } })
+  -- Unbounded and still growing, so the inline view keeps the tail only.
+  eq(true, #lines <= 5, "tail capped: " .. #lines .. " lines")
+  eq(true, lines[1]:find("earlier lines", 1, true) ~= nil, "earlier-lines marker: " .. lines[1])
+  -- The float lifts the cap.
+  local full = events.tool_content_lines({ { type = "terminal", terminalId = id } }, true)
+  eq(true, #full > #lines, "float shows more")
+  eq(nil, table.concat(full, "\n"):find("earlier lines", 1, true), "nothing elided in the float")
+  terminal.release(id)
+  require("acp.config").setup({})
 end
 
 function T.toggle_expands_collapsed_tool_entry()

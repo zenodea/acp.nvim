@@ -16,42 +16,49 @@ end
 local T = {}
 
 function T.diff_single_line_change_renders_one_hunk()
-  ui({ diff_context = 2, diff_max_lines = 24 })
+  ui({ diff_context = 2 })
   local old = table.concat({ "a", "b", "c", "d", "e", "f", "g", "h" }, "\n")
   local new = table.concat({ "a", "b", "c", "X", "e", "f", "g", "h" }, "\n")
   eq({ "⋯", "  b", "  c", "- d", "+ X", "  e", "  f", "⋯" }, diff(old, new))
 end
 
 function T.diff_insertion()
-  ui({ diff_context = 2, diff_max_lines = 24 })
+  ui({ diff_context = 2 })
   eq({ "  a", "  b", "+ INS", "  c" }, diff("a\nb\nc", "a\nb\nINS\nc"))
 end
 
 function T.diff_deletion()
-  ui({ diff_context = 1, diff_max_lines = 24 })
+  ui({ diff_context = 1 })
   eq({ "  a", "- b", "  c" }, diff("a\nb\nc", "a\nc"))
 end
 
 function T.diff_new_file_is_all_additions()
-  ui({ diff_max_lines = 24 })
+  ui({})
   eq({ "+ x", "+ y" }, diff("", "x\ny"))
 end
 
 function T.diff_identical_text_renders_nothing()
-  ui({ diff_max_lines = 24 })
+  ui({})
   eq({}, diff("a\nb", "a\nb"))
 end
 
-function T.diff_truncates_beyond_max_lines()
-  ui({ diff_context = 0, diff_max_lines = 4 })
-  local new = table.concat({ "1", "2", "3", "4", "5", "6", "7", "8" }, "\n")
-  local lines = diff("", new)
-  eq(5, #lines)
-  eq("… (4 more lines)", lines[5])
+function T.diff_is_never_truncated()
+  -- Expanding a tool call means you want to read the change, so the whole
+  -- diff renders however long it is.
+  ui({ diff_context = 0, terminal_max_lines = 4 })
+  local big = {}
+  for i = 1, 300 do
+    big[i] = tostring(i)
+  end
+  local lines = diff("", table.concat(big, "\n"))
+  eq(300, #lines)
+  eq("+ 1", lines[1])
+  eq("+ 300", lines[300])
+  eq(nil, table.concat(lines, "\n"):find("more lines", 1, true), "no truncation marker")
 end
 
 function T.diff_gap_between_hunks_marked()
-  ui({ diff_context = 2, diff_max_lines = 50 })
+  ui({ diff_context = 2 })
   local old_t = {}
   for i = 1, 12 do
     old_t[i] = "L" .. i
@@ -75,7 +82,7 @@ function T.diff_gap_between_hunks_marked()
 end
 
 function T.diff_close_hunks_do_not_duplicate_context()
-  ui({ diff_context = 3, diff_max_lines = 50 })
+  ui({ diff_context = 3 })
   eq(
     { "  a", "- b", "+ B", "  c", "- d", "+ D", "  e" },
     diff(table.concat({ "a", "b", "c", "d", "e" }, "\n"), table.concat({ "a", "B", "c", "D", "e" }, "\n"))
@@ -83,7 +90,7 @@ function T.diff_close_hunks_do_not_duplicate_context()
 end
 
 function T.diff_trailing_gap_marked()
-  ui({ diff_context = 1, diff_max_lines = 50 })
+  ui({ diff_context = 1 })
   local lines =
     diff(table.concat({ "a", "b", "c", "d", "e", "f" }, "\n"), table.concat({ "a", "X", "c", "d", "e", "f" }, "\n"))
   eq({ "  a", "- b", "+ X", "  c", "⋯" }, lines)
@@ -96,13 +103,13 @@ function T.diff_disabled_renders_nothing()
 end
 
 function T.content_item_is_indented()
-  ui({ diff_max_lines = 24 })
+  ui({})
   local lines = events.tool_content_lines({ { type = "content", content = { type = "text", text = "hello" } } })
   eq({ "  hello" }, lines)
 end
 
 function T.tool_text_status_suffix()
-  ui({ diff_max_lines = 24 })
+  ui({})
   eq("thing ✗", events.tool_text({ title = "thing", status = "failed" }))
   -- Unfinished calls carry no suffix: the chat spins a glyph next to them.
   eq("thing", events.tool_text({ title = "thing", status = "pending" }))

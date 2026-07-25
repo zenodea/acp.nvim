@@ -95,9 +95,9 @@ history, `gm` config, `gq` edit queued prompts, `gp` plan, `gs` subagents,
 `gf` follow, `/` commands, `y`/`a`/`n` permissions. `Esc` in normal mode
 interrupts too, in both the input and the transcript.
 
-Chat transcript: `Enter` expand/collapse an entry, `Shift-Enter` open a tool
-call's full content in a float (`q` closes), `gd` jump to the code a tool
-call touched.
+Chat transcript: `Enter` expand/collapse an entry — expanding a tool call
+shows its whole diff, however long — `Shift-Enter` open a tool call's full
+content in a float (`q` closes), `gd` jump to the code a tool call touched.
 
 Messages sent while the agent is working are queued; the input winbar shows
 the count. `gq` opens the queue as plain text in a floating buffer — edit,
@@ -152,7 +152,7 @@ require("acp").setup({
     focus_on_open = "keep",  -- "keep" | "input" | "code" | "sidebar"
     show_thinking = true,
     show_diffs = true,
-    diff_max_lines = 24,
+    terminal_max_lines = 24, -- tail of terminal output kept inline
     diff_context = 3,
     show_result_meta = true,
     auto_title = true,
