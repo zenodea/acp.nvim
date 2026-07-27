@@ -38,7 +38,7 @@ M.defaults = {
   ui = {
     sidebar_width = 30,
     chat_width = 64,
-    input_height = 5,
+    input_height = 8,
     -- Height of the details panel docked under the sidebar: the current
     -- thread's branch and diff, plan progress, running subagents, queued
     -- prompts, and context usage. Unset, it matches the prompt window

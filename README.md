@@ -163,7 +163,7 @@ require("acp").setup({
   ui = {
     sidebar_width = 30,
     chat_width = 64,
-    input_height = 5,
+    input_height = 8,
     details_height = nil,    -- details panel under the sidebar; unset it is
                              -- as tall as the prompt window, 0 hides it
     hide_tabline = true,     -- threads are tabs, the sidebar replaces the tabline
