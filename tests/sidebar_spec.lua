@@ -97,18 +97,28 @@ function T.workspace_at_cursor_follows_groups()
   eq(nil, sidebar.workspace_at_cursor(), "leading blank line -> no group")
 end
 
-function T.the_open_thread_is_banded()
+function T.the_open_thread_wears_a_rail()
   sidebar.render()
   local ns = vim.api.nvim_get_namespaces()["acp-sidebar"]
-  local banded = {}
+  local railed = {}
   for _, m in ipairs(vim.api.nvim_buf_get_extmarks(sidebar.buf, ns, 0, -1, { details = true })) do
-    if m[4].line_hl_group == "AcpSidebarActive" then
-      table.insert(banded, m[2] + 1)
+    if m[4].hl_group == "AcpSidebarActive" then
+      table.insert(railed, m[2] + 1)
     end
   end
   -- Only the thread the sidebar considers open (last_active here, the tab's
-  -- thread in a real workspace) carries the band.
-  eq({ line_of("beta") }, banded)
+  -- thread in a real workspace) carries the rail.
+  eq({ line_of("beta") }, railed)
+  -- Drawn in the first column, where 'cursorline' has nothing to say, and
+  -- costing the same width as the blank rail every other row carries, so
+  -- the icons stay in one column.
+  local railed_row, plain_row = lines()[line_of("beta")], lines()[line_of("alpha")]
+  eq("▎", railed_row:sub(1, #"▎"))
+  eq(" ", plain_row:sub(1, 1))
+  local width = function(l)
+    return vim.fn.strdisplaywidth(l:match("^[▎ ]+"))
+  end
+  eq(width(plain_row), width(railed_row), "same indent either way")
 end
 
 function T.render_lists_all_threads()
