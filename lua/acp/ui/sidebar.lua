@@ -182,7 +182,7 @@ function M.render()
   end
 
   -- The thread you are in (or came from, when the tab is not a workspace)
-  -- is banded, so the list says which conversation is on screen even after
+  -- is railed, so the list says which conversation is on screen even after
   -- the cursor has wandered off it.
   local in_tab = registry.find_by_tab and registry.find_by_tab(vim.api.nvim_get_current_tabpage())
   local active_id = (in_tab and in_tab.id) or registry.last_active
@@ -203,15 +203,22 @@ function M.render()
       -- Double space: several agent glyphs render double-width, which
       -- visually swallows a single space before the name.
       local label = agent_icon and (agent_icon .. "  " .. t.name) or t.name
-      table.insert(lines, string.format("   %s %s", icon, label))
+      -- A rail down the left edge, not a band across the row: 'cursorline'
+      -- already draws a band here, and two of those in one window read as
+      -- the same thing. The blank rail keeps every row aligned.
+      local rail = t.id == active_id and "▎" or " "
+      local prefix = rail .. "  "
+      table.insert(lines, prefix .. icon .. " " .. label)
       line_map[#lines] = t.id
       group_map[#lines] = group.ws
       table.insert(name_lines, #lines)
       name_set[#lines] = true
+      table.insert(marks, { #lines - 1, hls.status_group(t.status), #prefix + #icon + 1 })
       if t.id == active_id then
-        table.insert(marks, { #lines - 1, "AcpSidebarActive" })
+        -- After the status mark, whose span starts at column 0 too: the
+        -- later mark of a pair wins the overlap, and the rail is the point.
+        table.insert(marks, { #lines - 1, "AcpSidebarActive", #rail })
       end
-      table.insert(marks, { #lines - 1, hls.status_group(t.status), #icon + 4 })
       if t.status_detail and (t.status == "attention" or t.status == "error") then
         table.insert(lines, "       " .. t.status_detail)
         line_map[#lines] = t.id

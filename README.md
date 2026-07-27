@@ -19,8 +19,9 @@ Each thread's tab has three columns: your editing windows, the agent chat, and
 the threads sidebar on the right. The sidebar groups threads by workspace —
 the main checkout first, then one section per worktree — and shows a status
 per thread: an animated spinner while working, `?` needs you, `✓` done, `✗`
-failed. The thread whose tab you are in is banded, so the list says which
-conversation is on screen. Background threads that need attention also fire a
+failed. The thread whose tab you are in wears a `▎` rail in the left column,
+so the list says which conversation is on screen without competing with
+`cursorline`. Background threads that need attention also fire a
 notification, and `require("acp").statusline()` gives you a summary for your
 statusline.
 
