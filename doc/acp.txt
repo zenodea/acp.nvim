@@ -399,7 +399,6 @@ are no threads. Example for a custom statusline: >lua
 All groups are defined with `default = true` — links, except the title chip,
 which is derived from the colourscheme — and can be overridden:
 
-  AcpSidebarTitle     sidebar title            -> Title
   AcpSidebarHint      sidebar hints            -> Comment
   AcpSidebarGroup     workspace group headers  -> Directory
   AcpStatusWorking    working status           -> DiagnosticWarn

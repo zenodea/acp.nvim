@@ -92,7 +92,7 @@ function T.workspace_at_cursor_follows_groups()
   vim.api.nvim_win_set_cursor(0, { line_of("feat-x"), 0 })
   eq("feat/x", sidebar.workspace_at_cursor().branch, "group header -> the worktree")
   vim.api.nvim_win_set_cursor(0, { 1, 0 })
-  eq(nil, sidebar.workspace_at_cursor(), "title line -> no group")
+  eq(nil, sidebar.workspace_at_cursor(), "leading blank line -> no group")
 end
 
 function T.render_lists_all_threads()
