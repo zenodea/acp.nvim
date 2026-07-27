@@ -147,6 +147,9 @@ function M.setup(opts)
   if require("acp.config").options.ui.hide_tabline then
     vim.o.showtabline = 0
   end
+  if require("acp.config").options.ui.global_statusline then
+    vim.o.laststatus = 3
+  end
 
   local util = require("acp.util")
   local cwd = vim.fn.getcwd()
