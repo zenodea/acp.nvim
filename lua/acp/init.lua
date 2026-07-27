@@ -52,9 +52,12 @@ local function setup_autocmds()
 
   vim.api.nvim_create_autocmd("TabEnter", {
     group = group,
-    desc = "Repaint the details panel for this tab's thread",
+    desc = "Repaint the details panel and sidebar for this tab's thread",
     callback = function()
       require("acp.ui.details").render()
+      -- Both buffers are shared by every tab and show the current one's
+      -- thread: the panel's contents, the sidebar's band on the open thread.
+      require("acp.ui.sidebar").render()
     end,
   })
 

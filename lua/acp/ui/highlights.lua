@@ -31,20 +31,22 @@ function M.setup()
     vim.api.nvim_set_hl(0, group, { link = link, default = true })
   end
 
-  -- The title chip every plugin window wears in its winbar. No colourscheme
-  -- ships a group for it, so it is derived: Title's colour on the fill used
-  -- for popups, which reads as a small box on any background. Re-derived
+  -- Two groups no colourscheme ships, so they are derived from the fill it
+  -- uses for popups: the title chip every plugin window wears in its winbar,
+  -- and the band on the open thread in the sidebar. Both are re-derived
   -- whenever the colourscheme changes (see the ColorScheme autocmd).
   local function resolve(name)
     local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = name, link = false })
     return (ok and hl) or {}
   end
+  local fill = resolve("Pmenu").bg or resolve("CursorLine").bg or resolve("Visual").bg
   vim.api.nvim_set_hl(0, "AcpWinbarTitle", {
     fg = resolve("Title").fg,
-    bg = resolve("Pmenu").bg or resolve("CursorLine").bg or resolve("Visual").bg,
+    bg = fill,
     bold = true,
     default = true,
   })
+  vim.api.nvim_set_hl(0, "AcpSidebarActive", { bg = fill, default = true })
 end
 
 ---@param status ThreadStatus

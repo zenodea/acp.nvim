@@ -132,37 +132,36 @@ T.tool_call_update_renders_in_place = H.test("tool_diff", function(thread)
   eq(true, #marks > 0, "chat extmarks present")
 end)
 
-T.context_counter_reaches_the_winbar = H.test("reports_usage", function(thread)
-  -- Rendered, not raw: the raw winbar always carries the title chip's
-  -- highlight items, and those are `%` too.
-  local win = H.win(thread, "chat")
-  local before = vim.api.nvim_eval_statusline(vim.wo[win].winbar, { winid = win, use_winbar = true }).str
-  eq(nil, before:find("%%"), "no counter before the agent reports one")
+T.context_counter_reaches_the_details_panel = H.test("reports_usage", function(thread)
+  eq(false, H.details_has("of context"), "no counter before the agent reports one")
   H.send(thread, "hi")
   H.wait_done(thread)
   eq({ used = 42000, size = 200000 }, thread.usage, "usage recorded on the thread")
-  -- 42k of 200k is 21%; the winbar stores it %-escaped for statusline syntax.
-  local winbar = vim.wo[win].winbar
-  eq(true, winbar:find("◔ 21%%", 1, true) ~= nil, "winbar: " .. winbar)
+  eq(true, H.details_has("◔ 21% of context"), "42k of 200k is 21%")
+  -- It stays out of the chat title, which only names the model.
+  local win = H.win(thread, "chat")
+  local rendered = vim.api.nvim_eval_statusline(vim.wo[win].winbar, { winid = win, use_winbar = true }).str
+  eq(nil, rendered:find("%%"), "chat title: " .. rendered)
 end)
 
--- 'winbar' takes statusline syntax, so a bare % in a name (or in the context
--- counter) used to raise E539 and leave the winbar unset.
-T.percent_in_a_thread_name_survives_the_winbar = H.test("greeting", function(thread)
-  thread.usage = { used = 1, size = 2 }
-  thread.name = "50% done"
+-- 'winbar' takes statusline syntax, so a bare % in a model label used to
+-- raise E539 and leave the winbar unset.
+T.percent_in_a_model_label_survives_the_winbar = H.test("greeting", function(thread)
+  thread.session.config_options = {
+    { id = "model", category = "model", currentValue = "the 50% model" },
+  }
   require("acp.ui.workspace").update_winbar(thread)
   local win = H.win(thread, "chat")
   local rendered = vim.api.nvim_eval_statusline(vim.wo[win].winbar, { winid = win, use_winbar = true }).str
-  eq(true, rendered:find("50% done", 1, true) ~= nil, "rendered: " .. rendered)
-  eq(true, rendered:find("◑ 50%", 1, true) ~= nil, "rendered: " .. rendered)
+  eq(true, rendered:find("the 50% model", 1, true) ~= nil, "rendered: " .. rendered)
 end)
 
-T.plan_reaches_winbar_and_panel = H.test("planning", function(thread)
+T.plan_reaches_the_details_panel_and_float = H.test("planning", function(thread)
   H.send(thread, "plan it")
   H.wait_done(thread)
   eq(true, H.chat_has(thread, "◐ Write the parser"), "plan in the transcript")
-  eq(true, vim.wo[H.win(thread, "chat")].winbar:find("▤ 1/3", 1, true) ~= nil, "step count in the winbar")
+  eq(true, H.details_has("▤ plan 1/3"), "step count in the details panel")
+  eq(true, H.details_has("Write the parser"), "the step being worked on")
   -- gp opens the latest plan wherever you are in the conversation.
   H.feed(H.win(thread, "chat"), "gp")
   eq("editor", vim.api.nvim_win_get_config(0).relative, "plan panel is a float")
@@ -178,8 +177,13 @@ T.subagent_spawns_are_tracked_and_listed = H.test("delegating", function(thread)
   eq(true, H.chat_has(thread, "◇ Task: audit the parser"), "first spawn iconed")
   eq(true, H.chat_has(thread, "◇ Explore the loader"), "second spawn iconed")
   eq(2, #thread.subagents, "the ordinary tool call was not tracked")
-  -- One of the two is still going, so the winbar keeps its count.
-  eq(true, vim.wo[H.win(thread, "chat")].winbar:find("◇ 1", 1, true) ~= nil, "running count in the winbar")
+  -- One of the two is still going, and only that one is in the details
+  -- panel (titles there are shortened to the panel's width).
+  local rows = vim.tbl_filter(function(l)
+    return l:find("◇", 1, true) ~= nil
+  end, H.details_lines())
+  eq(1, #rows, "one running spawn listed: " .. vim.inspect(H.details_lines()))
+  eq(true, rows[1]:find("◇ Explore", 1, true) ~= nil, "row: " .. rows[1])
 
   H.feed(H.win(thread, "chat"), "gs")
   eq("editor", vim.api.nvim_win_get_config(0).relative, "subagent panel is a float")

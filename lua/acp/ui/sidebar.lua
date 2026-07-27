@@ -181,6 +181,12 @@ function M.render()
     table.insert(marks, { #lines - 1, "AcpSidebarHint" })
   end
 
+  -- The thread you are in (or came from, when the tab is not a workspace)
+  -- is banded, so the list says which conversation is on screen even after
+  -- the cursor has wandered off it.
+  local in_tab = registry.find_by_tab and registry.find_by_tab(vim.api.nvim_get_current_tabpage())
+  local active_id = (in_tab and in_tab.id) or registry.last_active
+
   local working = false
   for _, group in ipairs(grouped(registry)) do
     table.insert(lines, " " .. group.title)
@@ -202,6 +208,9 @@ function M.render()
       group_map[#lines] = group.ws
       table.insert(name_lines, #lines)
       name_set[#lines] = true
+      if t.id == active_id then
+        table.insert(marks, { #lines - 1, "AcpSidebarActive" })
+      end
       table.insert(marks, { #lines - 1, hls.status_group(t.status), #icon + 4 })
       if t.status_detail and (t.status == "attention" or t.status == "error") then
         table.insert(lines, "       " .. t.status_detail)

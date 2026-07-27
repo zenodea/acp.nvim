@@ -281,7 +281,10 @@ function M.reveal(thread, path, line)
   return win
 end
 
----Refresh the chat title: "chat" plus "name · agent [mode] ▤ 2/5 ◇ 1 ◔ 21%".
+---Refresh the chat title: "chat" plus what you are talking to — the model
+---and mode the session is set to. Nothing else: the thread's name is in the
+---sidebar, and what the agent is doing (plan, subagents, context) is in the
+---details panel.
 ---@param thread Thread
 function M.update_winbar(thread)
   if not thread:tab_valid() then
@@ -291,8 +294,6 @@ function M.update_winbar(thread)
   if not win then
     return
   end
-  local agent = thread:agent_name()
-  local text = thread.name .. (agent and (" · " .. agent) or "")
   local session = thread.session
   local badges = {}
   if session then
@@ -307,25 +308,11 @@ function M.update_winbar(thread)
       table.insert(badges, (mode and mode.name) or session.modes.currentModeId)
     end
   end
-  if #badges > 0 then
-    text = text .. " [" .. table.concat(badges, " · ") .. "]"
-  end
-  -- Plan progress rides outside the brackets: those hold what the session is
-  -- configured as, this is what it is doing.
-  local done, total = require("acp.ui.plan").progress(thread)
-  if total > 0 then
-    text = text .. ("  ▤ %d/%d"):format(done, total)
-  end
-  local subagents = require("acp.ui.subagents").running(thread)
-  if subagents > 0 then
-    text = text .. ("  ◇ %d"):format(subagents)
-  end
-  local usage = require("acp.agent.events").usage_text(thread.usage)
-  if usage then
-    text = text .. "  " .. usage
-  end
+  -- Agents that report no model at all still get named, so the bar is never
+  -- blank about who is on the other end.
+  local text = #badges > 0 and table.concat(badges, " · ") or (thread:agent_name() or "")
   if session and session.starting then
-    text = text .. "  " .. (session.spinner or "…") .. " starting"
+    text = (text ~= "" and (text .. "  ") or "") .. (session.spinner or "…") .. " starting"
   end
   set_title(win, "chat", text)
   -- Everything the winbar summarises (plan, subagents, usage) also feeds the
