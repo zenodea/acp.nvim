@@ -37,6 +37,10 @@ M.defaults = {
 
   ui = {
     sidebar_width = 30,
+    -- Height of the details panel docked under the sidebar: the current
+    -- thread's branch and diff, plan progress, running subagents, queued
+    -- prompts, and context usage. 0 hides the panel.
+    details_height = 7,
     chat_width = 64,
     input_height = 5,
     -- Hide the native tabline (each thread is a tab page; the sidebar

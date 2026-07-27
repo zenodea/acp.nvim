@@ -50,6 +50,14 @@ local function setup_autocmds()
     end,
   })
 
+  vim.api.nvim_create_autocmd("TabEnter", {
+    group = group,
+    desc = "Repaint the details panel for this tab's thread",
+    callback = function()
+      require("acp.ui.details").render()
+    end,
+  })
+
   vim.api.nvim_create_autocmd("TabClosed", {
     group = group,
     callback = function()
@@ -148,13 +156,16 @@ function M.setup(opts)
   setup_autocmds()
 
   local sidebar = require("acp.ui.sidebar")
+  local details = require("acp.ui.details")
   registry().on("status", function(thread, old, old_detail)
     sidebar.render()
+    details.render()
     store().save_debounced()
     notify_status(thread, old, old_detail)
   end)
   registry().on("threads", function()
     sidebar.render()
+    details.render()
     store().save_debounced()
   end)
   registry().on("state", function()
