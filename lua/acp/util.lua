@@ -35,6 +35,17 @@ function M.shorten(str, max)
   return vim.fn.strcharpart(str, 0, max - 1) .. "…"
 end
 
+---A span of seconds as "12s" / "1m02s", for runtimes shown in the UI.
+---@param secs integer
+---@return string
+function M.duration(secs)
+  secs = math.max(secs or 0, 0)
+  if secs < 60 then
+    return secs .. "s"
+  end
+  return ("%dm%02ds"):format(math.floor(secs / 60), secs % 60)
+end
+
 ---Stable key for a project root, used to name the state file.
 ---@param root string
 ---@return string

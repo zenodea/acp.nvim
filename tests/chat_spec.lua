@@ -257,6 +257,55 @@ function T.completed_tool_call_never_spins()
   eq(0, vim.tbl_count(spinners(buf)))
 end
 
+function T.a_streaming_thought_spins_under_a_thinking_header()
+  n = n + 1
+  local thread = h.thread("chat-test-" .. n)
+  local buf = chat.ensure_buf(thread)
+  chat.stream(thread, "thinking", "weighing the options\nand the trade-offs")
+  tick()
+  -- Collapsed to its header, which says the thought is still coming.
+  local shown = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  eq(2, #shown, "blank separator + header")
+  eq(true, shown[2]:find("thinking…", 1, true) ~= nil, "header: " .. shown[2])
+  eq(true, shown[2]:find("▸ 2 more", 1, true) ~= nil, "hidden-line count: " .. shown[2])
+  local spun = spinners(buf)
+  eq(1, vim.tbl_count(spun), "spinning while the thought streams")
+  eq(true, vim.tbl_contains(require("acp.util").spinner, vim.trim(spun[1] or "")), "a spinner frame")
+  local icons = require("acp.config").options.ui.icons
+  -- Covers the icon and its trailing space, so the header does not shift.
+  eq(vim.fn.strdisplaywidth(icons.thinking .. " "), vim.fn.strdisplaywidth(spun[1]), "same width as the icon it covers")
+end
+
+function T.a_finished_thought_reports_how_long_it_took()
+  n = n + 1
+  local thread = h.thread("chat-test-" .. n)
+  local buf = chat.ensure_buf(thread)
+  chat.stream(thread, "thinking", "weighing the options")
+  thread.transcript[1].started = os.time() - 12
+  tick()
+  -- Anything else landing in the transcript ends the thought.
+  chat.append(thread, "text", "here is the answer")
+  eq(0, vim.tbl_count(spinners(buf)), "spinner gone once the agent moves on")
+  local elapsed = thread.transcript[1].elapsed
+  eq(true, elapsed >= 12, "duration recorded on the entry: " .. tostring(elapsed))
+  local header = vim.api.nvim_buf_get_lines(buf, 1, 2, false)[1]
+  eq(true, header:find("thought for " .. elapsed .. "s", 1, true) ~= nil, "header: " .. header)
+end
+
+function T.expanding_a_thought_shows_the_whole_text()
+  n = n + 1
+  local thread = h.thread("chat-test-" .. n)
+  local buf = chat.ensure_buf(thread)
+  chat.stream(thread, "thinking", "first thought\nsecond thought")
+  chat.close_stream(thread)
+  chat.toggle_entry(thread, 1)
+  local shown = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  eq(4, #shown, "blank + header + both thought lines")
+  eq("  first thought", shown[3])
+  eq("  second thought", shown[4])
+  eq(nil, shown[2]:find("▸", 1, true), "expanded: no more-marker")
+end
+
 function T.expanding_a_tool_call_shows_the_whole_diff()
   n = n + 1
   local thread = h.thread("chat-test-" .. n)

@@ -82,11 +82,7 @@ end
 ---@param entry table subagent entry (see acp.ui.subagents)
 ---@return string
 local function duration(entry)
-  local secs = os.time() - (entry.started or os.time())
-  if secs < 60 then
-    return secs .. "s"
-  end
-  return ("%dm%02ds"):format(math.floor(secs / 60), secs % 60)
+  return require("acp.util").duration(os.time() - (entry.started or os.time()))
 end
 
 ---@return integer
