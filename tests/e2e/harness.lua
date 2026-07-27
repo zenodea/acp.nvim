@@ -128,8 +128,26 @@ function H.chat_has(thread, pat)
   return false
 end
 
+---Lines of the details panel, which always shows the current tab's thread —
+---the one under test. Long entries are shortened to the panel's width.
+---@return string[]
+function H.details_lines()
+  return vim.api.nvim_buf_get_lines(require("acp.ui.details").buf, 0, -1, false)
+end
+
+---True if some line of the details panel contains `pat` (plain match).
+---@param pat string
+function H.details_has(pat)
+  for _, l in ipairs(H.details_lines()) do
+    if l:find(pat, 1, true) then
+      return true
+    end
+  end
+  return false
+end
+
 ---@param thread table
----@param role string sidebar|chat|input
+---@param role string sidebar|chat|input|details
 ---@return integer
 function H.win(thread, role)
   local win = require("acp.ui.workspace").find_ui_win(thread.tabpage, role)

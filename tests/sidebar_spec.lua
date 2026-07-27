@@ -7,6 +7,8 @@ local registry = h.stub("acp.core.registry", {
     { id = "b", name = "beta", status = "working" },
     { id = "c", name = "gamma", status = "idle", worktree = { path = "/repo/.worktrees/feat-x", branch = "feat/x" } },
   },
+  find_by_tab = function() end, -- no thread owns the test tab
+  last_active = "b",
 })
 local sidebar = require("acp.ui.sidebar")
 
@@ -93,6 +95,20 @@ function T.workspace_at_cursor_follows_groups()
   eq("feat/x", sidebar.workspace_at_cursor().branch, "group header -> the worktree")
   vim.api.nvim_win_set_cursor(0, { 1, 0 })
   eq(nil, sidebar.workspace_at_cursor(), "leading blank line -> no group")
+end
+
+function T.the_open_thread_is_banded()
+  sidebar.render()
+  local ns = vim.api.nvim_get_namespaces()["acp-sidebar"]
+  local banded = {}
+  for _, m in ipairs(vim.api.nvim_buf_get_extmarks(sidebar.buf, ns, 0, -1, { details = true })) do
+    if m[4].line_hl_group == "AcpSidebarActive" then
+      table.insert(banded, m[2] + 1)
+    end
+  end
+  -- Only the thread the sidebar considers open (last_active here, the tab's
+  -- thread in a real workspace) carries the band.
+  eq({ line_of("beta") }, banded)
 end
 
 function T.render_lists_all_threads()

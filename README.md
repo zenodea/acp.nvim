@@ -19,13 +19,15 @@ Each thread's tab has three columns: your editing windows, the agent chat, and
 the threads sidebar on the right. The sidebar groups threads by workspace —
 the main checkout first, then one section per worktree — and shows a status
 per thread: an animated spinner while working, `?` needs you, `✓` done, `✗`
-failed. Background threads that need attention also fire a notification, and
-`require("acp").statusline()` gives you a summary for your statusline.
+failed. The thread whose tab you are in is banded, so the list says which
+conversation is on screen. Background threads that need attention also fire a
+notification, and `require("acp").statusline()` gives you a summary for your
+statusline.
 
 Every plugin window names itself in a small title chip at its top —
-`threads`, `chat`, `prompt`, `details` — with the live detail (thread name
-and model, send hints, queue) beside it; the statusline is left to the bottom
-of the screen.
+`threads`, `chat`, `prompt`, `details` — with the live detail (the model you
+are talking to, send hints, queue) beside it; the statusline is left to the
+bottom of the screen.
 
 Docked under the sidebar, a details panel keeps the current thread's vitals
 in view: its branch with ahead/behind counts and diff size, the plan step
@@ -51,14 +53,12 @@ the context counter.
 - [x] Favourite model per agent: the last model you pick becomes the default
 - [x] Sessions autostart when a thread is opened (spinner while booting)
 - [x] Prompt queue shown in the input winbar, editable with `gq`
-- [x] Plan panel (`gp`): the agent's current plan on demand, step count in
-      the chat winbar
-- [x] Subagent panel (`gs`): what the agent delegated, with status and
-      runtime; running count in the chat winbar
-- [x] Context counter in the chat winbar: `◔ 21%` of the model's window,
-      reported by the agent
+- [x] Plan panel (`gp`): the agent's current plan on demand
+- [x] Subagent panel (`gs`): what the agent delegated, with status and runtime
+- [x] Context counter: `◔ 21%` of the model's window, reported by the agent
 - [x] Details panel under the sidebar: branch, diff size, current plan step,
-      running subagents, queue, and context at a glance
+      running subagents, queue, and context at a glance — the chat title bar
+      carries only the model you are talking to
 - [x] Follow mode: jump to where the agent is working (`gf`), pinned to the
       window you pick with `<leader>cf`
 - [x] Persistence: threads, layouts, and conversations survive restarts
@@ -122,10 +122,10 @@ window (or `:w`) to apply.
 
 Agents that plan their work send their steps as they go. They land in the
 transcript, but scroll away; `gp` opens the latest plan in a float (`○` not
-started, `◐` in progress, `✓` done, `q` closes), and the chat winbar carries
-the step count as `▤ 2/5` while a plan is live.
+started, `◐` in progress, `✓` done, `q` closes), and the details panel keeps
+the step being worked on in view while a plan is live.
 
-The chat winbar carries a context counter — `◔ 21%` of the model's context
+The details panel carries a context counter — `◔ 21%` of the model's context
 window, straight from the agent — with the glyph filling up (`○ ◔ ◑ ◕ ●`) as
 the window does. Agents that don't report usage simply have no counter.
 
@@ -139,8 +139,8 @@ the mark and the on/off state are saved with the thread.
 Work an agent delegates arrives as an ordinary tool call — ACP has no notion
 of a subagent — so acp.nvim recognises them by title (`subagent_patterns`,
 covering Claude Code's `Task` by default). Spawns get the `◇` icon in the
-transcript, `gs` lists them with status and runtime, and the winbar shows
-`◇ 2` while any are still running.
+transcript, `gs` lists them with status and runtime, and the details panel
+lists the running ones with their runtime.
 
 ## Configuration
 
