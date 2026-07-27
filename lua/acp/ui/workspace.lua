@@ -119,7 +119,9 @@ end
 ---Split off the sidebar leaf so the panel stays inside the sidebar column.
 function M.build_details()
   local cfg = require("acp.config").options.ui
-  if (cfg.details_height or 0) <= 0 then
+  -- Unset, the panel is as tall as the prompt window it faces.
+  local height = cfg.details_height or cfg.input_height
+  if height <= 0 then
     return
   end
   local tab = vim.api.nvim_get_current_tabpage()
@@ -132,7 +134,7 @@ function M.build_details()
   end
   local cur = vim.api.nvim_get_current_win()
   vim.api.nvim_set_current_win(sidebar_win)
-  vim.cmd("belowright " .. cfg.details_height .. "split")
+  vim.cmd("belowright " .. height .. "split")
   local win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_buf(win, require("acp.ui.details").ensure_buf())
   mark(win, "details")

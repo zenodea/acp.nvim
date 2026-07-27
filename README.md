@@ -162,9 +162,10 @@ require("acp").setup({
   subagent_patterns = { "^Task%f[%W]", "^Agent%f[%W]", "^Explore%f[%W]", "[Ss]ubagent" },
   ui = {
     sidebar_width = 30,
-    details_height = 7,      -- details panel under the sidebar; 0 hides it
     chat_width = 64,
     input_height = 5,
+    details_height = nil,    -- details panel under the sidebar; unset it is
+                             -- as tall as the prompt window, 0 hides it
     hide_tabline = true,     -- threads are tabs, the sidebar replaces the tabline
     global_statusline = true,-- one statusline at the bottom (laststatus=3)
     focus_on_open = "keep",  -- "keep" | "input" | "code" | "sidebar"
