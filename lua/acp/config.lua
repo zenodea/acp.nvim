@@ -46,6 +46,11 @@ M.defaults = {
     -- Hide the native tabline (each thread is a tab page; the sidebar
     -- already shows them). Sets showtabline=0.
     hide_tabline = true,
+    -- One statusline at the bottom of the screen instead of one per window
+    -- (sets laststatus=3, globally). The plugin's windows say what they are
+    -- in their title bar, so a statusline each is noise — and the windows
+    -- end up separated by drawn lines instead of bars.
+    global_statusline = true,
     -- Window focused after opening/switching a thread:
     -- "keep" stays in the same kind of window you came from (sidebar stays
     -- sidebar, code stays code); "input" | "code" | "sidebar" force one.

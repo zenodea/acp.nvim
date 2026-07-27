@@ -1,19 +1,35 @@
 local M = {}
 
----Set a window's winbar from plain text. 'winbar' takes statusline syntax,
----where `%` introduces an item: an unescaped one in a thread name, a model
----label, or a percentage raises E539 and leaves the winbar unset. None of
----this text is meant as syntax, so double every `%`.
+---Title a window: a highlighted chip saying what the window is, followed by
+---optional live detail. With one statusline at the bottom of the screen
+---(ui.global_statusline) this bar is a plugin window's only nameplate.
+---
+---'winbar' takes statusline syntax, where `%` introduces an item: an
+---unescaped one in a thread name, a model label, or a percentage raises E539
+---and leaves the winbar unset. Only the highlight items below are meant as
+---syntax, so every `%` coming from elsewhere is doubled.
 ---@param win integer
----@param text string
-local function set_winbar(win, text)
-  vim.wo[win].winbar = (text:gsub("%%", "%%%%"))
+---@param title string
+---@param detail string|nil
+local function set_title(win, title, detail)
+  -- `%<` puts the truncation point after the chip: in a narrow window the
+  -- detail gets cut, never the name of the window.
+  local text = "%#AcpWinbarTitle# " .. title:gsub("%%", "%%%%") .. " %#AcpWinbarDetail#%<"
+  if detail and detail ~= "" then
+    text = text .. " " .. detail:gsub("%%", "%%%%")
+  end
+  vim.wo[win].winbar = text
 end
 
 ---@param win integer
 ---@param role string
 local function mark(win, role)
   vim.w[win].acp_ui = role
+  -- The window says what it is in its winbar, so its statusline has nothing
+  -- left to say: blank it rather than show the `acp://…` buffer name. Moot
+  -- under ui.global_statusline (laststatus=3 draws one bar for the screen),
+  -- which is why it degrades to an empty bar rather than a second title.
+  vim.wo[win].statusline = " "
   -- Callers set the window's buffer before marking; from here on the window
   -- refuses buffer swaps, so file explorers pick a code window instead of
   -- clobbering the sidebar/chat/input.
@@ -93,6 +109,7 @@ function M.build_sidebar()
   local win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_buf(win, buf)
   mark(win, "sidebar")
+  set_title(win, "threads")
   vim.wo[win].winfixwidth = true
   vim.wo[win].cursorline = true
   require("acp.ui.sidebar").snap()
@@ -119,6 +136,7 @@ function M.build_details()
   local win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_buf(win, require("acp.ui.details").ensure_buf())
   mark(win, "details")
+  set_title(win, "details")
   vim.wo[win].winfixheight = true
   vim.wo[win].winfixwidth = true
   vim.wo[win].wrap = false
@@ -195,7 +213,11 @@ function M.update_follow_winbar(thread)
   local on = thread:follow_enabled()
   for _, win in ipairs(vim.api.nvim_tabpage_list_wins(thread.tabpage)) do
     if vim.w[win].acp_follow then
-      set_winbar(win, on and (" ⟳ following " .. thread:agent_name()) or " ⟳ follow paused (gf)")
+      if on then
+        set_title(win, "⟳ following", thread:agent_name())
+      else
+        set_title(win, "⟳ follow paused", "gf to resume")
+      end
     end
   end
 end
@@ -257,7 +279,7 @@ function M.reveal(thread, path, line)
   return win
 end
 
----Refresh the chat winbar: "name · agent [mode]  ▤ 2/5  ◇ 1  ◔ 21%".
+---Refresh the chat title: "chat" plus "name · agent [mode] ▤ 2/5 ◇ 1 ◔ 21%".
 ---@param thread Thread
 function M.update_winbar(thread)
   if not thread:tab_valid() then
@@ -268,7 +290,7 @@ function M.update_winbar(thread)
     return
   end
   local agent = thread:agent_name()
-  local text = " " .. thread.name .. (agent and (" · " .. agent) or "")
+  local text = thread.name .. (agent and (" · " .. agent) or "")
   local session = thread.session
   local badges = {}
   if session then
@@ -303,13 +325,13 @@ function M.update_winbar(thread)
   if session and session.starting then
     text = text .. "  " .. (session.spinner or "…") .. " starting"
   end
-  set_winbar(win, text)
+  set_title(win, "chat", text)
   -- Everything the winbar summarises (plan, subagents, usage) also feeds the
   -- details panel, so this is its repaint hub too.
   require("acp.ui.details").render()
 end
 
----Refresh the input winbar: send hints, plus the prompt queue when non-empty.
+---Refresh the input title: send hints, plus the prompt queue when non-empty.
 ---@param thread Thread
 function M.update_input_winbar(thread)
   if not thread:tab_valid() then
@@ -321,9 +343,9 @@ function M.update_input_winbar(thread)
   end
   local queue = (thread.session and thread.session.queue) or {}
   if #queue > 0 then
-    set_winbar(win, (" ⧗ %d queued · gq edit · C-c interrupt"):format(#queue))
+    set_title(win, "prompt", ("⧗ %d queued · gq edit · C-c interrupt"):format(#queue))
   else
-    set_winbar(win, " ⏎ send · C-j newline · C-c interrupt")
+    set_title(win, "prompt", "⏎ send · C-j newline · C-c interrupt")
   end
   require("acp.ui.details").render()
 end

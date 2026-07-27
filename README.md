@@ -22,6 +22,11 @@ per thread: an animated spinner while working, `?` needs you, `✓` done, `✗`
 failed. Background threads that need attention also fire a notification, and
 `require("acp").statusline()` gives you a summary for your statusline.
 
+Every plugin window names itself in a small title chip at its top —
+`threads`, `chat`, `prompt`, `details` — with the live detail (thread name
+and model, send hints, queue) beside it; the statusline is left to the bottom
+of the screen.
+
 Docked under the sidebar, a details panel keeps the current thread's vitals
 in view: its branch with ahead/behind counts and diff size, the plan step
 being worked on, running subagents with their runtime, queued prompts, and
@@ -157,6 +162,7 @@ require("acp").setup({
     chat_width = 64,
     input_height = 5,
     hide_tabline = true,     -- threads are tabs, the sidebar replaces the tabline
+    global_statusline = true,-- one statusline at the bottom (laststatus=3)
     focus_on_open = "keep",  -- "keep" | "input" | "code" | "sidebar"
     show_thinking = true,
     show_diffs = true,

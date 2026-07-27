@@ -105,12 +105,16 @@ T.tool_call_update_renders_in_place = H.test("tool_diff", function(thread)
 end)
 
 T.context_counter_reaches_the_winbar = H.test("reports_usage", function(thread)
-  eq(nil, vim.wo[H.win(thread, "chat")].winbar:find("%%"), "no counter before the agent reports one")
+  -- Rendered, not raw: the raw winbar always carries the title chip's
+  -- highlight items, and those are `%` too.
+  local win = H.win(thread, "chat")
+  local before = vim.api.nvim_eval_statusline(vim.wo[win].winbar, { winid = win, use_winbar = true }).str
+  eq(nil, before:find("%%"), "no counter before the agent reports one")
   H.send(thread, "hi")
   H.wait_done(thread)
   eq({ used = 42000, size = 200000 }, thread.usage, "usage recorded on the thread")
   -- 42k of 200k is 21%; the winbar stores it %-escaped for statusline syntax.
-  local winbar = vim.wo[H.win(thread, "chat")].winbar
+  local winbar = vim.wo[win].winbar
   eq(true, winbar:find("◔ 21%%", 1, true) ~= nil, "winbar: " .. winbar)
 end)
 

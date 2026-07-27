@@ -44,6 +44,11 @@ you a summary for your statusline. Inside the transcript, a tool call the
 agent has not finished yet spins in place of its tool icon; the icon
 returns when the call lands.
 
+Every plugin window names itself in a small title chip at its top —
+`threads`, `chat`, `prompt`, `details` — with the live detail (thread name
+and model, send hints, queue) beside it. The statusline is left to the
+bottom of the screen (|acp-options| `ui.global_statusline`).
+
                                                              *acp-context*
 The chat winbar carries a context counter, e.g. `◔ 21%`: how full the
 model's context window is, straight from the agent (ACP `usage_update`).
@@ -306,6 +311,10 @@ Defaults: >lua
       input_height = 5,
       -- Hide the native tabline (sets 'showtabline' to 0).
       hide_tabline = true,
+      -- One statusline at the bottom of the screen instead of one per
+      -- window (sets 'laststatus' to 3). The plugin's windows carry a
+      -- title bar, so a statusline each is noise.
+      global_statusline = true,
       -- Window focused after opening/switching a thread: "keep" stays in
       -- the same kind of window you came from; "input" | "code" |
       -- "sidebar" force one.
@@ -383,7 +392,8 @@ are no threads. Example for a custom statusline: >lua
 ==============================================================================
 12. HIGHLIGHTS                                                *acp-highlights*
 
-All groups are defined with `default = true` links and can be overridden:
+All groups are defined with `default = true` — links, except the title chip,
+which is derived from the colourscheme — and can be overridden:
 
   AcpSidebarTitle     sidebar title            -> Title
   AcpSidebarHint      sidebar hints            -> Comment
@@ -406,6 +416,8 @@ All groups are defined with `default = true` links and can be overridden:
   AcpDiffSep          ⋯ hunk gap markers       -> NonText
   AcpPlanActive       in-progress plan step    -> Title
   AcpChip             context chips            -> Special
+  AcpWinbarDetail     detail next to a title   -> Comment
+  AcpWinbarTitle      window title chip        -> Title on the Pmenu fill
 
 ==============================================================================
 13. HEALTH                                                        *acp-health*
