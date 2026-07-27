@@ -26,7 +26,7 @@ local function mark(win, role)
   vim.wo[win].spell = false
 end
 
----Build the chat column (chat + input) next to the sidebar (or far left).
+---Build the chat column (chat + input) next to the sidebar (or far right).
 ---@param thread Thread
 function M.build_chat_column(thread)
   local cfg = require("acp.config").options.ui
@@ -44,9 +44,9 @@ function M.build_chat_column(thread)
       pcall(vim.api.nvim_win_close, details_win, true)
     end
     vim.api.nvim_set_current_win(sidebar_win)
-    vim.cmd("rightbelow " .. cfg.chat_width .. "vsplit")
+    vim.cmd("leftabove " .. cfg.chat_width .. "vsplit")
   else
-    vim.cmd("topleft " .. cfg.chat_width .. "vsplit")
+    vim.cmd("botright " .. cfg.chat_width .. "vsplit")
   end
   local chat_win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_buf(chat_win, chat_buf)
@@ -85,11 +85,11 @@ function M.build_chat_column(thread)
   M.build_details()
 end
 
----Build the threads sidebar window on the left of the current tab.
+---Build the threads sidebar window on the right of the current tab.
 function M.build_sidebar()
   local cfg = require("acp.config").options.ui
   local buf = require("acp.ui.sidebar").ensure_buf()
-  vim.cmd("topleft " .. cfg.sidebar_width .. "vsplit")
+  vim.cmd("botright " .. cfg.sidebar_width .. "vsplit")
   local win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_buf(win, buf)
   mark(win, "sidebar")
@@ -135,13 +135,13 @@ local function build_tab(thread)
     vim.cmd("tcd " .. vim.fn.fnameescape(thread.cwd))
   end
 
-  -- Right: restore the persisted code layout into the initial window.
+  -- Left: restore the persisted code layout into the initial window.
   local code_win = vim.api.nvim_get_current_win()
   if thread.layout then
     require("acp.persist.layout").restore(thread.layout)
   end
 
-  -- Column order: sidebar | chat | code.
+  -- Column order: code | chat | sidebar.
   vim.api.nvim_set_current_win(code_win)
   M.build_sidebar()
   M.build_chat_column(thread)
