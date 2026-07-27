@@ -2,7 +2,6 @@ local M = {}
 
 function M.setup()
   local links = {
-    AcpSidebarTitle = "Title",
     AcpSidebarHint = "Comment",
     AcpSidebarGroup = "Directory",
     AcpStatusWorking = "DiagnosticWarn",

@@ -168,8 +168,9 @@ function M.render()
   local cfg = options.ui
   local hls = require("acp.ui.highlights")
 
-  local lines = { " ACP", "" }
-  local marks = { { 0, "AcpSidebarTitle" } }
+  -- No title line: the window's winbar chip already says what this is.
+  local lines = { "" }
+  local marks = {}
   line_map = {}
   group_map = {}
   name_lines = {}
