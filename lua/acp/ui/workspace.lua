@@ -33,8 +33,16 @@ function M.build_chat_column(thread)
   local chat_buf = require("acp.ui.chat").ensure_buf(thread)
   local input_buf = require("acp.ui.input").ensure_buf(thread)
 
-  local sidebar_win = M.find_ui_win(vim.api.nvim_get_current_tabpage(), "sidebar")
+  local tab = vim.api.nvim_get_current_tabpage()
+  local sidebar_win = M.find_ui_win(tab, "sidebar")
   if sidebar_win then
+    -- The chat splits off the sidebar leaf: a details window stacked below
+    -- it would end up spanning under the new chat, so drop it and rebuild
+    -- it once the chat column is in place.
+    local details_win = M.find_ui_win(tab, "details")
+    if details_win then
+      pcall(vim.api.nvim_win_close, details_win, true)
+    end
     vim.api.nvim_set_current_win(sidebar_win)
     vim.cmd("rightbelow " .. cfg.chat_width .. "vsplit")
   else
@@ -74,6 +82,7 @@ function M.build_chat_column(thread)
     vim.api.nvim_win_set_width(sidebar_win, cfg.sidebar_width)
   end
   vim.api.nvim_win_set_width(chat_win, cfg.chat_width)
+  M.build_details()
 end
 
 ---Build the threads sidebar window on the left of the current tab.
@@ -87,6 +96,35 @@ function M.build_sidebar()
   vim.wo[win].winfixwidth = true
   vim.wo[win].cursorline = true
   require("acp.ui.sidebar").snap()
+end
+
+---Build the details panel docked below the sidebar of the current tab.
+---Split off the sidebar leaf so the panel stays inside the sidebar column.
+function M.build_details()
+  local cfg = require("acp.config").options.ui
+  if (cfg.details_height or 0) <= 0 then
+    return
+  end
+  local tab = vim.api.nvim_get_current_tabpage()
+  if M.find_ui_win(tab, "details") then
+    return
+  end
+  local sidebar_win = M.find_ui_win(tab, "sidebar")
+  if not sidebar_win then
+    return
+  end
+  local cur = vim.api.nvim_get_current_win()
+  vim.api.nvim_set_current_win(sidebar_win)
+  vim.cmd("belowright " .. cfg.details_height .. "split")
+  local win = vim.api.nvim_get_current_win()
+  vim.api.nvim_win_set_buf(win, require("acp.ui.details").ensure_buf())
+  mark(win, "details")
+  vim.wo[win].winfixheight = true
+  vim.wo[win].winfixwidth = true
+  vim.wo[win].wrap = false
+  vim.wo[win].cursorline = false -- inherited from the sidebar split
+  pcall(vim.api.nvim_set_current_win, cur)
+  require("acp.ui.details").render()
 end
 
 ---@param thread Thread
@@ -266,6 +304,9 @@ function M.update_winbar(thread)
     text = text .. "  " .. (session.spinner or "…") .. " starting"
   end
   set_winbar(win, text)
+  -- Everything the winbar summarises (plan, subagents, usage) also feeds the
+  -- details panel, so this is its repaint hub too.
+  require("acp.ui.details").render()
 end
 
 ---Refresh the input winbar: send hints, plus the prompt queue when non-empty.
@@ -284,6 +325,7 @@ function M.update_input_winbar(thread)
   else
     set_winbar(win, " ⏎ send · C-j newline · C-c interrupt")
   end
+  require("acp.ui.details").render()
 end
 
 ---@param tabpage integer

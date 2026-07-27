@@ -22,6 +22,11 @@ thread: an animated spinner while working, `?` needs you, `✓` done, `✗`
 failed. Background threads that need attention also fire a notification, and
 `require("acp").statusline()` gives you a summary for your statusline.
 
+Docked under the sidebar, a details panel keeps the current thread's vitals
+in view: its branch with ahead/behind counts and diff size, the plan step
+being worked on, running subagents with their runtime, queued prompts, and
+the context counter.
+
 ## Features
 
 - [x] One agent process per thread, different agents per thread
@@ -44,6 +49,8 @@ failed. Background threads that need attention also fire a notification, and
       runtime; running count in the chat winbar
 - [x] Context counter in the chat winbar: `◔ 21%` of the model's window,
       reported by the agent
+- [x] Details panel under the sidebar: branch, diff size, current plan step,
+      running subagents, queue, and context at a glance
 - [x] Follow mode: jump to where the agent is working (`gf`), pinned to the
       window you pick with `<leader>cf`
 - [x] Persistence: threads, layouts, and conversations survive restarts
@@ -146,6 +153,7 @@ require("acp").setup({
   subagent_patterns = { "^Task%f[%W]", "^Agent%f[%W]", "^Explore%f[%W]", "[Ss]ubagent" },
   ui = {
     sidebar_width = 30,
+    details_height = 7,      -- details panel under the sidebar; 0 hides it
     chat_width = 64,
     input_height = 5,
     hide_tabline = true,     -- threads are tabs, the sidebar replaces the tabline

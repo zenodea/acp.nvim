@@ -15,7 +15,7 @@ T.handshake_and_workspace = H.test("greeting", function(thread)
       code_wins = code_wins + 1
     end
   end
-  eq({ chat = true, input = true, sidebar = true }, roles, "ui windows")
+  eq({ chat = true, input = true, sidebar = true, details = true }, roles, "ui windows")
   eq(1, code_wins, "one code window")
   H.wait_for(function()
     return thread.session and thread.session.ready
