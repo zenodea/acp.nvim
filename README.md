@@ -38,6 +38,9 @@ the context counter.
 - [x] Optional git worktree and branch per thread
 - [x] Streaming chat with live tool calls, diffs, and plans; unfinished tool
       calls spin in place of their icon until they land
+- [x] Thinking is an action like any other: `✱ thinking…` spins while the
+      thought streams, settles into `thought for 12s`, and `Enter` unfolds
+      the reasoning
 - [x] Permission prompts answered inline in the chat
 - [x] Agent reads and writes through your buffers, unsaved edits included
 - [x] Editor-provided terminals with live command output
@@ -108,8 +111,9 @@ history, `gm` config, `gq` edit queued prompts, `gp` plan, `gs` subagents,
 interrupts too, in both the input and the transcript.
 
 Chat transcript: `Enter` expand/collapse an entry — expanding a tool call
-shows its whole diff, however long — `Shift-Enter` open a tool call's full
-content in a float (`q` closes), `gd` jump to the code a tool call touched.
+shows its whole diff, however long, and expanding a thought shows what the
+agent was reasoning about — `Shift-Enter` open a tool call's full content in
+a float (`q` closes), `gd` jump to the code a tool call touched.
 
 Messages sent while the agent is working are queued; the input winbar shows
 the count. `gq` opens the queue as plain text in a floating buffer — edit,

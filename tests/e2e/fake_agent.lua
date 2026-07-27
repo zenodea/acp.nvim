@@ -45,6 +45,8 @@ local function play(steps)
   for _, step in ipairs(steps) do
     if step.chunk then
       update({ sessionUpdate = "agent_message_chunk", content = { type = "text", text = step.chunk } })
+    elseif step.thought then
+      update({ sessionUpdate = "agent_thought_chunk", content = { type = "text", text = step.thought } })
     elseif step.tool_call then
       local u = vim.tbl_extend("force", { sessionUpdate = "tool_call" }, step.tool_call)
       update(u)

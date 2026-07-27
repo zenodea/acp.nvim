@@ -7,6 +7,8 @@ local util = require("acp.util")
 ---@field text string
 ---@field id string|nil stable id (e.g. toolCallId)
 ---@field tool string|nil ACP tool kind (read/edit/execute/...)
+---@field started integer|nil unix time a thought started streaming
+---@field elapsed integer|nil seconds a finished thought took
 
 ---@class Thread
 ---@field id string

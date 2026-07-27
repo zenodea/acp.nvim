@@ -54,11 +54,28 @@ local function is_collapsed(s, kind, index)
   return c
 end
 
+---Header of a thought: what the agent is doing, not what it said. The text
+---itself lives behind the fold, so this line has to carry the state — still
+---coming, or done and how long it took.
+---@param entry TranscriptEntry
+---@param live boolean|nil the thought is still streaming
+---@return string
+local function thinking_head(entry, live)
+  if live then
+    return "thinking…"
+  elseif (entry.elapsed or 0) > 0 then
+    return "thought for " .. require("acp.util").duration(entry.elapsed)
+  end
+  -- Under a second, or a thought cut short by a crash: no duration to give.
+  return "thought"
+end
+
 ---@param icons table
 ---@param entry TranscriptEntry
 ---@param collapsed boolean|nil
+---@param live boolean|nil the entry is still streaming (thoughts only)
 ---@return string[]
-local function entry_lines(icons, entry, collapsed)
+local function entry_lines(icons, entry, collapsed, live)
   local kind, text = entry.kind, entry.text
   local body = require("acp.util").lines(text)
   -- Every entry starts with one blank line, so completed actions are always
@@ -72,20 +89,29 @@ local function entry_lines(icons, entry, collapsed)
     return { "", icon_prefix(icons.user) .. text }
   end
 
-  local prefix
-  if kind == "tool" then
-    prefix = (icons.tool_kinds or {})[entry.tool] or icons.tool
-  else
-    prefix = ({ thinking = icons.thinking, error = "✗", permission = icons.permission })[kind]
-  end
   local content
-  if prefix then
-    content = {}
-    for i, l in ipairs(body) do
-      content[i] = (i == 1 and icon_prefix(prefix) or "  ") .. l
+  if kind == "thinking" then
+    -- Titled like a tool call rather than by its first line: the thought is
+    -- the body, the header is the state.
+    content = { icon_prefix(icons.thinking) .. thinking_head(entry, live) }
+    for _, l in ipairs(body) do
+      table.insert(content, "  " .. l)
     end
-  else -- text / meta / plan
-    content = body
+  else
+    local prefix
+    if kind == "tool" then
+      prefix = (icons.tool_kinds or {})[entry.tool] or icons.tool
+    else
+      prefix = ({ error = "✗", permission = icons.permission })[kind]
+    end
+    if prefix then
+      content = {}
+      for i, l in ipairs(body) do
+        content[i] = (i == 1 and icon_prefix(prefix) or "  ") .. l
+      end
+    else -- text / meta / plan
+      content = body
+    end
   end
 
   if collapsed and collapsible[kind] and #content > 1 then
@@ -107,6 +133,11 @@ local function update_pad(buf)
   })
 end
 
+---Settle the thought in flight; declared here, assigned below rerender,
+---which it needs.
+---@type fun(thread: Thread)
+local finish_thinking
+
 ---Drop the spinner glyph of entry `index`, if it has one.
 ---@param s table chat state
 ---@param index integer
@@ -121,17 +152,25 @@ end
 ---in step rather than each on its own phase.
 local frame = require("acp.util").spinner[1]
 
----The spinner frame padded to the display width of entry `index`'s tool
----icon, so overlaying it swaps the icon for the spinner without shifting
----the title.
+---The icon an entry leads with, which is what a spinner covers while the
+---entry is in flight.
+---@param entry TranscriptEntry|nil
+---@return string
+local function entry_icon(entry)
+  local icons = require("acp.config").options.ui.icons
+  if entry and entry.kind == "thinking" then
+    return icons.thinking
+  end
+  return (entry and (icons.tool_kinds or {})[entry.tool]) or icons.tool
+end
+
+---The spinner frame padded to the display width of entry `index`'s icon, so
+---overlaying it swaps the icon for the spinner without shifting the title.
 ---@param s table chat state
 ---@param index integer
 ---@return string
 local function spinner_text(s, index)
-  local icons = require("acp.config").options.ui.icons
-  local entry = s.thread and s.thread.transcript[index]
-  local prefix = (entry and (icons.tool_kinds or {})[entry.tool]) or icons.tool
-  local width = vim.fn.strdisplaywidth(icon_prefix(prefix))
+  local width = vim.fn.strdisplaywidth(icon_prefix(entry_icon(s.thread and s.thread.transcript[index])))
   return frame .. string.rep(" ", math.max(width - 1, 1))
 end
 
@@ -151,11 +190,13 @@ spin = require("acp.util").spinner_timer(function(f)
       for index in pairs(s.spinning) do
         local range = s.ranges[index]
         if range then
+          local entry = s.thread and s.thread.transcript[index]
+          local hl = (entry and entry.kind == "thinking") and "AcpChatThinking" or "AcpChatTool"
           -- start + 1 is the title line: entries open with a blank line, and
-          -- a collapsed tool call keeps its title as the only visible one.
+          -- a collapsed entry keeps its title as the only visible one.
           pcall(vim.api.nvim_buf_set_extmark, buf, ns_spin, range.start + 1, 0, {
             id = index,
-            virt_text = { { spinner_text(s, index), "AcpChatTool" } },
+            virt_text = { { spinner_text(s, index), hl } },
             virt_text_pos = "overlay",
           })
         end
@@ -193,13 +234,14 @@ function M.set_status(thread, id, status)
 end
 
 ---Stop every spinner in this thread: the turn is over, so a call the agent
----never marked finished is not running either.
+---never marked finished is not running either — nor is it still thinking.
 ---@param thread Thread
 function M.stop_spinners(thread)
   local s = state[thread.id]
   if not s then
     return
   end
+  finish_thinking(thread)
   for index in pairs(s.spinning) do
     del_spinner(s, index)
   end
@@ -339,7 +381,8 @@ end
 local function push_render(thread, buf, entry)
   local s = st(thread)
   local icons = require("acp.config").options.ui.icons
-  local lines = entry_lines(icons, entry, is_collapsed(s, entry.kind, #s.ranges + 1))
+  local index = #s.ranges + 1
+  local lines = entry_lines(icons, entry, is_collapsed(s, entry.kind, index), s.thinking == index)
   local start
   vim.bo[buf].modifiable = true
   if #s.ranges == 0 then
@@ -374,7 +417,7 @@ local function rerender(thread, index)
     return
   end
   local icons = require("acp.config").options.ui.icons
-  local lines = entry_lines(icons, entry, is_collapsed(s, entry.kind, index))
+  local lines = entry_lines(icons, entry, is_collapsed(s, entry.kind, index), s.thinking == index)
   -- Streaming appends re-render per chunk: skip when nothing changed, and
   -- replace buffer lines only from the first divergence (usually just the
   -- tail of the entry).
@@ -401,6 +444,25 @@ local function rerender(thread, index)
     end
   end
   update_pad(buf)
+end
+
+---Close the thought in flight, if any: the agent has moved on, so the entry
+---stops spinning and its header settles on how long the thought took.
+---@param thread Thread
+finish_thinking = function(thread)
+  local s = state[thread.id]
+  local index = s and s.thinking
+  if not index then
+    return
+  end
+  s.thinking = nil
+  s.spinning[index] = nil
+  del_spinner(s, index)
+  local entry = thread.transcript[index]
+  if entry then
+    entry.elapsed = math.max(os.time() - (entry.started or os.time()), 0)
+    rerender(thread, index)
+  end
 end
 
 ---Blank lines are separators, not content: keep the cursor on content
@@ -611,13 +673,30 @@ end
 ---@param id string|nil stable id (e.g. toolCallId) for later updates
 ---@param tool_kind string|nil ACP tool kind (read/edit/execute/...) for icons
 function M.append(thread, kind, text, id, tool_kind)
+  -- Anything else landing in the transcript means the agent stopped thinking.
+  if kind ~= "thinking" then
+    finish_thinking(thread)
+  end
   local entry = { kind = kind, text = text, id = id, tool = tool_kind }
+  if kind == "thinking" then
+    entry.started = os.time()
+  end
   table.insert(thread.transcript, entry)
   local buf = M.ensure_buf(thread)
   local s = st(thread)
+  if kind == "thinking" then
+    -- A thought arrives chunk by chunk with no status of its own: it counts
+    -- as in flight — spinner and all — until something else lands.
+    s.thinking = #thread.transcript
+    s.spinning[s.thinking] = true
+    spin.start()
+  end
   -- ensure_buf may have just replayed the full transcript (including this entry)
   if #s.ranges < #thread.transcript then
     push_render(thread, buf, entry)
+  elseif kind == "thinking" then
+    -- Replayed before the entry was marked in flight: repaint its header.
+    rerender(thread, s.thinking)
   end
   s.open = false
   -- Sending a message re-attaches every window to the bottom.
@@ -648,6 +727,8 @@ end
 ---@param thread Thread
 function M.close_stream(thread)
   st(thread).open = false
+  -- The stream is what kept a thought in flight.
+  finish_thinking(thread)
 end
 
 ---Update the entry registered under `id` (tool-call updates), if any.
@@ -688,6 +769,7 @@ function M.replay(thread)
   s.collapsed = {}
   -- Entry indices are about to be rebuilt; nothing replayed is in flight.
   s.spinning = {}
+  s.thinking = nil
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, {})
   vim.bo[buf].modifiable = false

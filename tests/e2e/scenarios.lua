@@ -2,6 +2,7 @@
 ---A scenario is a list of turns; turn N answers the N-th session/prompt
 ---(the last turn repeats). Each turn is a list of steps executed in order:
 ---  { chunk = "text" }          agent_message_chunk
+---  { thought = "text" }        agent_thought_chunk
 ---  { tool_call = {...} }       tool_call update (toolCallId, title, kind, ...)
 ---  { tool_update = {...} }     tool_call_update (merged into the call)
 ---  { plan = { entries } }      plan update
@@ -25,6 +26,16 @@ return {
   question = {
     turns = {
       { { chunk = "Should I continue?" } },
+    },
+  },
+
+  thinking = {
+    turns = {
+      {
+        { thought = "weighing the options" },
+        { thought = "\nand the trade-offs" },
+        { chunk = "Here is the answer." },
+      },
     },
   },
 

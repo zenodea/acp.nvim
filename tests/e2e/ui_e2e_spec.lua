@@ -89,6 +89,34 @@ T.permission_flow = H.test("permission", function(thread)
   eq("idle", thread.status)
 end)
 
+-- A thought is a first-class action in the transcript: collapsed to a header
+-- while it streams, settled (and expandable) once the agent moves on.
+T.thinking_collapses_to_a_header_and_expands = H.test("thinking", function(thread)
+  H.send(thread, "think about it")
+  H.wait_done(thread)
+  local header
+  for _, l in ipairs(H.chat_lines(thread)) do
+    if l:find("thought", 1, true) then
+      header = l
+    end
+  end
+  eq(true, header ~= nil, "settled thought header: " .. table.concat(H.chat_lines(thread), "|"))
+  eq(true, header:find("▸ 2 more", 1, true) ~= nil, "both thought lines folded away: " .. header)
+  eq(false, H.chat_has(thread, "weighing the options"), "thought text hidden while collapsed")
+
+  -- <CR> on the header unfolds the thought itself.
+  local win = H.win(thread, "chat")
+  for i, l in ipairs(H.chat_lines(thread)) do
+    if l == header then
+      vim.api.nvim_win_set_cursor(win, { i, 0 })
+      break
+    end
+  end
+  H.feed(win, "\r")
+  eq(true, H.chat_has(thread, "weighing the options"), "expanded thought text")
+  eq(true, H.chat_has(thread, "and the trade-offs"), "every chunk merged into one thought")
+end)
+
 T.tool_call_update_renders_in_place = H.test("tool_diff", function(thread)
   H.send(thread, "edit")
   H.wait_done(thread)
