@@ -15,10 +15,10 @@ plus its own workspace: a tab page, a window layout, and optionally a git
 worktree. Several agents can work on the same repository at the same time
 without interfering with each other or with you.
 
-Each thread's tab has three columns: the threads sidebar, the agent chat, and
-your editing windows. The sidebar groups threads by workspace — the main
-checkout first, then one section per worktree — and shows a status per
-thread: an animated spinner while working, `?` needs you, `✓` done, `✗`
+Each thread's tab has three columns: your editing windows, the agent chat, and
+the threads sidebar on the right. The sidebar groups threads by workspace —
+the main checkout first, then one section per worktree — and shows a status
+per thread: an animated spinner while working, `?` needs you, `✓` done, `✗`
 failed. Background threads that need attention also fire a notification, and
 `require("acp").statusline()` gives you a summary for your statusline.
 
