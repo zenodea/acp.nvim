@@ -182,4 +182,30 @@ function T.quit_last_code_window_closes_plugin_windows()
   eq(false, vim.api.nvim_win_is_valid(ui_win), "plugin window closed too")
 end
 
+function T.empty_thread_name_gets_a_temp_name()
+  local cfg = require("acp.config")
+  local registry = require("acp.core.registry")
+  local old_autostart, old_select, old_input = cfg.options.autostart, vim.ui.select, vim.ui.input
+  cfg.options.autostart = false
+  vim.ui.select = function(items, _, cb)
+    cb(items[1], 1) -- first agent
+  end
+  vim.ui.input = function(_, cb)
+    cb("") -- user presses Enter without typing a name
+  end
+
+  local ok, err = pcall(require("acp").new)
+
+  vim.ui.select, vim.ui.input = old_select, old_input
+  cfg.options.autostart = old_autostart
+  assert(ok, err)
+
+  local t = registry.threads[#registry.threads]
+  eq(true, t.name:match("^%l+-%l+$") ~= nil, "temp name is adjective-noun: " .. t.name)
+  eq(nil, t.manual_name, "temp name is not manual")
+  require("acp.ui.workspace").close(t)
+  vim.cmd("silent! tabonly!")
+  registry.remove(t)
+end
+
 return T
