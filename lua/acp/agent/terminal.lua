@@ -34,8 +34,15 @@ end
 ---@param on_update fun()|nil called on new output / exit
 ---@return string|nil terminal_id, string|nil err
 function M.create(params, cwd, on_update)
-  local cmd = { params.command }
-  vim.list_extend(cmd, params.args or {})
+  local cmd
+  if params.args and #params.args > 0 then
+    cmd = { params.command }
+    vim.list_extend(cmd, params.args)
+  else
+    -- Agent sent a shell command string (e.g. "cd /path && git log ...");
+    -- run it through sh -c so operators, pipes, and redirects work.
+    cmd = { "sh", "-c", params.command }
+  end
   local env
   for _, pair in ipairs(params.env or {}) do
     env = env or {}
@@ -61,23 +68,29 @@ function M.create(params, cwd, on_update)
     end
   end
 
-  local job = vim.fn.jobstart(cmd, {
-    cwd = (params.cwd and params.cwd ~= "" and params.cwd) or cwd,
-    env = env,
-    on_stdout = collect,
-    on_stderr = collect,
-    on_exit = function(_, code, _)
-      term.exit = { exitCode = code }
-      local waiters = term.waiters
-      term.waiters = {}
-      for _, respond in ipairs(waiters) do
-        pcall(respond, term.exit)
-      end
-      if term.on_update then
-        pcall(term.on_update)
-      end
-    end,
-  })
+  local job
+  local ok, err = pcall(function()
+    job = vim.fn.jobstart(cmd, {
+      cwd = (params.cwd and params.cwd ~= "" and params.cwd) or cwd,
+      env = env,
+      on_stdout = collect,
+      on_stderr = collect,
+      on_exit = function(_, code, _)
+        term.exit = { exitCode = code }
+        local waiters = term.waiters
+        term.waiters = {}
+        for _, respond in ipairs(waiters) do
+          pcall(respond, term.exit)
+        end
+        if term.on_update then
+          pcall(term.on_update)
+        end
+      end,
+    })
+  end)
+  if not ok then
+    return nil, "failed to spawn: " .. tostring(err)
+  end
   if job <= 0 then
     return nil, "failed to spawn: " .. table.concat(cmd, " ")
   end
