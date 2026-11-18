@@ -676,6 +676,21 @@ function Session:on_request(method, params, respond)
   elseif method == "fs/read_text_file" then
     local content, err = require("acp.agent.fs").read_text_file(params)
     if content then
+      -- Associate the file content with the most recent pending read tool
+      -- call. Agents (e.g. Devin) read the file through fs/read_text_file
+      -- but only send "N lines" as the tool call content, not the actual
+      -- file content. We capture it here so tool_text can render it.
+      for id, call in pairs(self.tool_calls) do
+        if call.kind == "read" and not call.read_content and call.status ~= "completed" then
+          call.read_content = content
+          call._lines = nil
+          local text = events.tool_text(call)
+          if not chat().update_by_id(self.thread, id, text) then
+            chat().append(self.thread, "tool", text, id, "read")
+          end
+          break
+        end
+      end
       respond({ content = content })
     else
       respond(nil, { code = -32603, message = err })
