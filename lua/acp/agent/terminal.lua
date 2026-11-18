@@ -133,8 +133,15 @@ function M.release(id)
   if not term then
     return false
   end
-  vim.fn.jobstop(term.job)
-  terminals[id] = nil
+  if term.job then
+    vim.fn.jobstop(term.job)
+    term.job = nil
+  end
+  -- ACP spec: "the Client displays live output as it's generated and
+  -- continues to display it even after the terminal is released."  Keep
+  -- the terminal data so render_lines and output still work; just mark
+  -- it released so we don't try to stop the job twice.
+  term.released = true
   return true
 end
 
