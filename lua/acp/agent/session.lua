@@ -693,6 +693,17 @@ function Session:on_request(method, params, respond)
       self:refresh_terminal_tools()
     end)
     if id then
+      -- Associate the terminal with the most recent execute tool call
+      -- that doesn't have one yet. Devin creates the terminal right
+      -- after the tool_call notification but never embeds it in the
+      -- tool call content, so we link them here for rendering.
+      for _, call in pairs(self.tool_calls) do
+        if call.kind == "execute" and not call.terminal_id and call.status ~= "completed" then
+          call.terminal_id = id
+          call._lines = nil -- force re-render
+          break
+        end
+      end
       respond({ terminalId = id })
     else
       respond(nil, { code = -32603, message = err })
@@ -817,10 +828,15 @@ end
 
 function Session:do_refresh_terminal_tools()
   for id, call in pairs(self.tool_calls) do
-    for _, item in ipairs(call.content or {}) do
-      if item.type == "terminal" then
-        chat().update_by_id(self.thread, id, events.tool_text(call))
-        break
+    if call.terminal_id then
+      -- Terminal associated via terminal/create, not embedded in content.
+      chat().update_by_id(self.thread, id, events.tool_text(call))
+    else
+      for _, item in ipairs(call.content or {}) do
+        if item.type == "terminal" then
+          chat().update_by_id(self.thread, id, events.tool_text(call))
+          break
+        end
       end
     end
   end
@@ -873,6 +889,8 @@ function Session:on_notification(method, params)
       status = u.status or "pending",
       content = u.content,
       locations = u.locations,
+      rawInput = u.rawInput,
+      rawOutput = u.rawOutput,
     }
     local tool_kind = self:track_subagent(id, self.tool_calls[id])
     chat().append(self.thread, "tool", events.tool_text(self.tool_calls[id]), id, tool_kind)
