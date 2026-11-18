@@ -4,6 +4,70 @@ local M = {}
 ---(working threads).
 M.spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
 
+---Adjectives and nouns for generating memorable temp thread names,
+---in the spirit of Docker container naming.
+local adjectives = {
+  "brave",
+  "calm",
+  "clever",
+  "eager",
+  "fierce",
+  "gentle",
+  "happy",
+  "jolly",
+  "keen",
+  "lively",
+  "merry",
+  "noble",
+  "patient",
+  "quiet",
+  "rapid",
+  "swift",
+  "tidy",
+  "urban",
+  "vivid",
+  "wise",
+  "young",
+  "zesty",
+  "bold",
+  "crisp",
+}
+
+local nouns = {
+  "otter",
+  "falcon",
+  "heron",
+  "lynx",
+  "marten",
+  "newt",
+  "osprey",
+  "pika",
+  "raven",
+  "stoat",
+  "swift",
+  "tiger",
+  "viper",
+  "wolf",
+  "yak",
+  "zebu",
+  "bison",
+  "camel",
+  "dingo",
+  "ermine",
+  "ferret",
+  "grouse",
+  "hare",
+  "ibex",
+}
+
+---A random two-word name like "clever-otter", for threads the user did
+---not name explicitly. The agent's first session_info_update replaces it
+---unless the user renames the thread first.
+---@return string
+function M.temp_name()
+  return adjectives[math.random(#adjectives)] .. "-" .. nouns[math.random(#nouns)]
+end
+
 ---Turn a human name into a filesystem/branch-safe slug.
 ---@param name string
 ---@return string

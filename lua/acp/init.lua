@@ -324,7 +324,7 @@ function M.new(name, opts)
 
   local function with_name(n)
     if not n or vim.trim(n) == "" then
-      return
+      n = require("acp.util").temp_name()
     end
     pick_agent(vim.trim(n))
   end
@@ -360,7 +360,7 @@ function M.new_worktree()
     end
     vim.ui.input({ prompt = "Thread name: " }, function(name)
       if not name or vim.trim(name) == "" then
-        return
+        name = util.temp_name()
       end
       M.new(name, { workspace = { create = slug } })
     end)
