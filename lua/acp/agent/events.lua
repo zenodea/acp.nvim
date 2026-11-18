@@ -151,6 +151,26 @@ function M.tool_text(call)
     end
   end
   local lines = { head }
+  -- For read tool calls, show the file path and content captured from
+  -- fs/read_text_file. Agents (e.g. Devin) only send "N lines" as the
+  -- tool call content, not the actual file content.
+  if call.kind == "read" and call.read_content then
+    local cfg = require("acp.config").options.ui
+    if cfg.show_diffs then
+      if call.locations and call.locations[1] and call.locations[1].path then
+        table.insert(lines, "  " .. call.locations[1].path)
+      end
+      local max = cfg.terminal_max_lines or 24
+      local all = util.lines((call.read_content or ""):gsub("\n+$", ""))
+      local from = math.max(1, #all - max + 1)
+      if from > 1 then
+        table.insert(lines, string.format("  … (%d earlier lines)", from - 1))
+      end
+      for i = from, #all do
+        table.insert(lines, "  " .. all[i])
+      end
+    end
+  end
   vim.list_extend(lines, content_lines)
   return table.concat(lines, "\n")
 end

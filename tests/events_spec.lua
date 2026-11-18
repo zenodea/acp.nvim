@@ -117,6 +117,58 @@ function T.tool_text_status_suffix()
   eq("thing", events.tool_text({ title = "thing", status = "completed" }))
 end
 
+function T.tool_text_shows_file_path_and_content_for_read()
+  ui({ show_diffs = true, terminal_max_lines = 24 })
+  local text = events.tool_text({
+    title = "Read file",
+    kind = "read",
+    status = "completed",
+    locations = { { path = "/src/main.lua" } },
+    read_content = "local x = 1\nlocal y = 2\n",
+  })
+  eq("Read file\n  /src/main.lua\n  local x = 1\n  local y = 2", text)
+end
+
+function T.tool_text_read_truncates_long_content()
+  ui({ show_diffs = true, terminal_max_lines = 3 })
+  local lines = {}
+  for i = 1, 10 do
+    lines[i] = "line " .. tostring(i)
+  end
+  local text = events.tool_text({
+    title = "Read file",
+    kind = "read",
+    status = "completed",
+    locations = { { path = "/big.txt" } },
+    read_content = table.concat(lines, "\n"),
+  })
+  eq("Read file\n  /big.txt\n  … (7 earlier lines)\n  line 8\n  line 9\n  line 10", text)
+end
+
+function T.tool_text_read_without_content_shows_only_title()
+  ui({ show_diffs = true })
+  local text = events.tool_text({
+    title = "Read file",
+    kind = "read",
+    status = "completed",
+    locations = { { path = "/src/main.lua" } },
+  })
+  eq("Read file", text)
+end
+
+function T.tool_text_read_respects_show_diffs()
+  ui({ show_diffs = false })
+  local text = events.tool_text({
+    title = "Read file",
+    kind = "read",
+    status = "completed",
+    locations = { { path = "/src/main.lua" } },
+    read_content = "local x = 1\n",
+  })
+  eq("Read file", text)
+  ui({ show_diffs = true })
+end
+
 function T.usage_gauge_fills_with_the_context_window()
   local function g(used, size)
     return events.usage_text({ used = used, size = size })
